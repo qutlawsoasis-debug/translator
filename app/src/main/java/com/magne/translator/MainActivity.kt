@@ -27,6 +27,12 @@ class MainActivity : Activity() {
         // Меняем текст, чтобы пользователь понял, что мы перешли на Stage 2
         val tvSource = findViewById<TextView>(R.id.tvSource)
         tvSource.text = "Приложение успешно перехвачено!"
+
+        // Обработчик для кнопки "Начать"
+        val btnStart = findViewById<android.widget.Button>(R.id.btnStart)
+        btnStart.setOnClickListener {
+            android.widget.Toast.makeText(this, "Переход на экран перевода...", android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onResume() {
