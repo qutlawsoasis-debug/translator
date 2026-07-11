@@ -12,18 +12,12 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
-import android.widget.ScrollView
 import android.widget.TextView
 import com.magne.translator.usb.UsbCommandManager
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class MainActivity : Activity() {
 
     private lateinit var usbManager: UsbCommandManager
-    private lateinit var tvLogs: TextView
-    private lateinit var svLogs: ScrollView
     private lateinit var systemUsbManager: UsbManager
 
     companion object {
@@ -34,20 +28,20 @@ class MainActivity : Activity() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 UsbManager.ACTION_USB_DEVICE_DETACHED -> {
-                    addLog("USB: устройство отключено")
+                    Log.d("USB", "Устройство отключено")
                     usbManager.disconnect()
                     finishAffinity()
                 }
                 ACTION_USB_PERMISSION -> {
                     synchronized(this) {
                         val device: UsbDevice? = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
-                        if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
+                        val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                        Log.d("USB", "Permission granted: $granted")
+                        
+                        if (granted) {
                             device?.let {
-                                addLog("USB: разрешение получено")
                                 connectToDevice(it)
                             }
-                        } else {
-                            addLog("USB: разрешение отклонено")
                         }
                     }
                 }
@@ -59,11 +53,9 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        tvLogs = findViewById(R.id.tvLogs)
-        svLogs = findViewById(R.id.svLogs)
         systemUsbManager = getSystemService(Context.USB_SERVICE) as UsbManager
         
-        usbManager = UsbCommandManager(this) { msg -> addLog(msg) }
+        usbManager = UsbCommandManager(this) { msg -> Log.d("USB", msg) }
 
         val tvSource = findViewById<TextView>(R.id.tvSource)
         tvSource.text = "Подключение к плате..."
@@ -75,6 +67,7 @@ class MainActivity : Activity() {
         }
 
         usbManager.startListening { command ->
+            Log.d("USB", "Received: $command")
             when (command) {
                 "CHECK_UPDATE" -> usbManager.send("UPDATE_NONE")
                 "CHECK_MODELS" -> usbManager.send("MODELS_OK")
@@ -88,7 +81,12 @@ class MainActivity : Activity() {
         
         val filter = IntentFilter(ACTION_USB_PERMISSION)
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
-        registerReceiver(usbReceiver, filter)
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(usbReceiver, filter)
+        }
     }
 
     private fun checkUsbDevices() {
@@ -96,24 +94,25 @@ class MainActivity : Activity() {
         val targetDevice = deviceList.values.find { it.vendorId == 4919 && it.productId == 2 }
         
         if (targetDevice != null) {
-            addLog("USB: устройство найдено VID=${targetDevice.vendorId} PID=${targetDevice.productId}")
+            Log.d("USB", "Device found: $targetDevice")
             if (systemUsbManager.hasPermission(targetDevice)) {
-                addLog("USB: разрешение уже есть")
+                Log.d("USB", "Разрешение уже есть")
                 connectToDevice(targetDevice)
             } else {
-                addLog("USB: запрос разрешения...")
+                Log.d("USB", "Запрос разрешения...")
                 val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
                 val permissionIntent = PendingIntent.getBroadcast(this, 0, Intent(ACTION_USB_PERMISSION), flag)
                 systemUsbManager.requestPermission(targetDevice, permissionIntent)
             }
         } else {
-            addLog("USB: Плата не найдена в системе")
+            Log.d("USB", "Плата не найдена в системе")
         }
     }
 
     private fun connectToDevice(device: UsbDevice) {
         if (usbManager.connect(device, systemUsbManager)) {
             findViewById<TextView>(R.id.tvSource).text = "Связь установлена!"
+            Log.d("USB", "Sending APP_READY")
             usbManager.send("APP_READY")
         }
     }
@@ -127,16 +126,5 @@ class MainActivity : Activity() {
         super.onDestroy()
         try { unregisterReceiver(usbReceiver) } catch (e: Exception) {}
         usbManager.disconnect()
-    }
-
-    private fun addLog(message: String) {
-        val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-        val logMsg = "[$time] $message"
-        Log.d("USB_DEBUG", logMsg)
-        
-        runOnUiThread {
-            tvLogs.append(logMsg + "\n")
-            svLogs.post { svLogs.fullScroll(ScrollView.FOCUS_DOWN) }
-        }
     }
 }
