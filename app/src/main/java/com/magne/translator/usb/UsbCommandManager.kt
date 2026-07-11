@@ -45,6 +45,8 @@ class UsbCommandManager(
         return try {
             serialPort?.open(connection)
             serialPort?.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
+            serialPort?.dtr = true
+            serialPort?.rts = true
             
             ioManager = SerialInputOutputManager(serialPort, this)
             ioManager?.start()
