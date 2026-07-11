@@ -1,19 +1,15 @@
 package com.magne.translator
 
-import android.app.DownloadManager
-import android.content.BroadcastReceiver
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.net.Uri
-import android.os.Environment
+import android.content.pm.PackageInstaller
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
-import androidx.core.content.FileProvider
 import org.json.JSONObject
-import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
@@ -31,9 +27,10 @@ class UpdateManager(private val context: Context) {
             if (connection.responseCode == 200) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(response)
-                val tagName = json.getString("tag_name")
-                // Для простоты MVP хардкодим текущую версию, либо читаем из манифеста
-                val currentVersion = "1.0" 
+                var tagName = json.getString("tag_name")
+                if (tagName.startsWith("v")) tagName = tagName.substring(1) // Убираем 'v' если есть
+                
+                val currentVersion = BuildConfig.VERSION_NAME
 
                 val assets = json.getJSONArray("assets")
                 var downloadUrl: String? = null
@@ -45,7 +42,6 @@ class UpdateManager(private val context: Context) {
                     }
                 }
 
-                // Сравниваем просто по несовпадению тега, чтобы любой релиз отличный от 1.0 считался обновой
                 if (tagName != currentVersion && downloadUrl != null) {
                     return@withContext UpdateResult(tagName, downloadUrl)
                 }
@@ -56,50 +52,44 @@ class UpdateManager(private val context: Context) {
         return@withContext null
     }
 
-    fun downloadAndInstall(updateResult: UpdateResult) {
-        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        val uri = Uri.parse(updateResult.downloadUrl)
-
-        // Удаляем старый файл если есть
-        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "app-update.apk")
-        if (file.exists()) file.delete()
-
-        val request = DownloadManager.Request(uri)
-            .setTitle("Обновление Переводчика")
-            .setDescription("Загрузка версии ${updateResult.version}")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, "app-update.apk")
-
-        val downloadId = downloadManager.enqueue(request)
-
-        val onComplete = object : BroadcastReceiver() {
-            override fun onReceive(ctxt: Context, intent: Intent) {
-                val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
-                if (downloadId == id) {
-                    installApk(file)
-                    context.unregisterReceiver(this)
-                }
-            }
-        }
-        // В Android 13+ BroadcastReceiver должен быть зарегистрирован с флагом, 
-        // но DownloadManager использует системные бродкасты.
-        context.registerReceiver(onComplete, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_EXPORTED)
-    }
-
-    private fun installApk(file: File) {
+    suspend fun downloadAndInstallSilent(updateResult: UpdateResult) = withContext(Dispatchers.IO) {
         try {
             Handler(Looper.getMainLooper()).post {
-                Toast.makeText(context, "Запуск установки обновления...", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Установка обновления ${updateResult.version}...", Toast.LENGTH_LONG).show()
             }
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+            val url = URL(updateResult.downloadUrl)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.connect()
+
+            val packageInstaller = context.packageManager.packageInstaller
+            val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
             }
-            context.startActivity(intent)
+            
+            val sessionId = packageInstaller.createSession(params)
+            val session = packageInstaller.openSession(sessionId)
+
+            val out = session.openWrite("update", 0, -1)
+            connection.inputStream.use { input ->
+                out.use { output ->
+                    input.copyTo(output)
+                }
+            }
+            session.fsync(out)
+
+            val intent = Intent(context, MainActivity::class.java)
+            val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+            val pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or flag)
+            
+            session.commit(pendingIntent.intentSender)
+            session.close()
         } catch (e: Exception) {
-            Log.e("UpdateManager", "Failed to start install intent", e)
+            Log.e("UpdateManager", "Failed to start silent install", e)
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(context, "Ошибка обновления", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 }

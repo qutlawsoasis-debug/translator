@@ -67,6 +67,9 @@ class MainActivity : Activity() {
         val tvSource = findViewById<TextView>(R.id.tvSource)
         tvSource.text = "Подключение к плате..."
 
+        val tvVersion = findViewById<TextView>(R.id.tvVersion)
+        tvVersion.text = "Версия: ${BuildConfig.VERSION_NAME}"
+
         val btnStart = findViewById<Button>(R.id.btnListen)
         btnStart.setOnClickListener {
             val intent = Intent(this, TranslatorActivity::class.java)
@@ -127,20 +130,11 @@ class MainActivity : Activity() {
                             }
                         }
                         "SHOW_UPDATE_DIALOG" -> {
-                            Log.d("USB", "Получили SHOW_UPDATE_DIALOG, показываем диалог")
+                            Log.d("USB", "Получили SHOW_UPDATE_DIALOG, запускаем тихое обновление")
                             updateResult?.let { result ->
-                                AlertDialog.Builder(this@MainActivity)
-                                    .setTitle("Доступно обновление!")
-                                    .setMessage("Новая версия: ${result.version}. Установить сейчас?")
-                                    .setPositiveButton("Да") { _, _ ->
-                                        updateManager.downloadAndInstall(result)
-                                    }
-                                    .setNegativeButton("Позже") { _, _ ->
-                                        // Продолжаем обычный флоу
-                                        usbManager.send("UPDATE_NONE")
-                                    }
-                                    .setCancelable(false)
-                                    .show()
+                                mainScope.launch {
+                                    updateManager.downloadAndInstallSilent(result)
+                                }
                             } ?: run {
                                 usbManager.send("UPDATE_NONE")
                             }
