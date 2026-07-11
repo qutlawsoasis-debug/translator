@@ -100,24 +100,37 @@ class MainActivity : Activity() {
         if (usbManager.connect(device, systemUsbManager)) {
             findViewById<TextView>(R.id.tvSource).text = "Связь установлена!"
             
-            // СНАЧАЛА startListening, ПОТОМ send
             usbManager.startListening { command ->
-                Log.d("USB", "Received: $command")
+                Log.d("USB", "=> Обработка команды в UI потоке: [$command]")
                 runOnUiThread {
                     when (command) {
-                        "HELLO" -> usbManager.send("APP_READY")
-                        "CHECK_UPDATE" -> usbManager.send("UPDATE_NONE")
-                        "CHECK_MODELS" -> usbManager.send("MODELS_OK")
+                        "HELLO" -> {
+                            Log.d("USB", "Получили HELLO, отвечаем APP_READY")
+                            usbManager.send("APP_READY")
+                        }
+                        "CHECK_UPDATE" -> {
+                            Log.d("USB", "Получили CHECK_UPDATE, отвечаем UPDATE_NONE")
+                            usbManager.send("UPDATE_NONE")
+                        }
+                        "CHECK_MODELS" -> {
+                            Log.d("USB", "Получили CHECK_MODELS, отвечаем MODELS_OK")
+                            usbManager.send("MODELS_OK")
+                        }
                         "START_TRANSLATOR" -> {
+                            Log.d("USB", "Получили START_TRANSLATOR, запускаем Activity")
                             val intent = Intent(this, TranslatorActivity::class.java)
                             startActivity(intent)
                         }
-                        "CLOSE" -> finishAffinity()
+                        "CLOSE" -> {
+                            Log.d("USB", "Получили CLOSE, закрываем приложение")
+                            finishAffinity()
+                        }
+                        else -> {
+                            Log.d("USB", "Неизвестная команда: [$command]")
+                        }
                     }
                 }
             }
-            Log.d("USB", "Sending APP_READY as fallback")
-            usbManager.send("APP_READY") // Оставляем на случай, если HELLO не придет
         }
     }
 
