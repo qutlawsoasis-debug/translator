@@ -31,7 +31,8 @@ class MainActivity : Activity() {
         // Обработчик для кнопки "Начать"
         val btnStart = findViewById<android.widget.Button>(R.id.btnListen)
         btnStart.setOnClickListener {
-            android.widget.Toast.makeText(this, "Переход на экран перевода...", android.widget.Toast.LENGTH_SHORT).show()
+            val intent = Intent(this, TranslatorActivity::class.java)
+            startActivity(intent)
         }
     }
 
