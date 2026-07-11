@@ -58,9 +58,25 @@ class UpdateManager(private val context: Context) {
                 Toast.makeText(context, "Установка обновления ${updateResult.version}...", Toast.LENGTH_LONG).show()
             }
 
-            val url = URL(updateResult.downloadUrl)
-            val connection = url.openConnection() as HttpURLConnection
-            connection.connect()
+            var currentUrl = updateResult.downloadUrl
+            var connection: HttpURLConnection
+            var redirects = 0
+            while (true) {
+                connection = URL(currentUrl).openConnection() as HttpURLConnection
+                connection.instanceFollowRedirects = false
+                connection.connect()
+                val responseCode = connection.responseCode
+                if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP || 
+                    responseCode == HttpURLConnection.HTTP_MOVED_PERM || 
+                    responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
+                    responseCode == 307 || responseCode == 308) {
+                    currentUrl = connection.getHeaderField("Location")
+                    redirects++
+                    if (redirects > 10) throw Exception("Too many redirects")
+                } else {
+                    break
+                }
+            }
 
             val packageInstaller = context.packageManager.packageInstaller
             val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
