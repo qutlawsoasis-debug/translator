@@ -3,6 +3,8 @@ package com.magne.translator.usb
 import android.content.Context
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
+import com.hoho.android.usbserial.driver.CdcAcmSerialDriver
+import com.hoho.android.usbserial.driver.ProbeTable
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
 import com.hoho.android.usbserial.util.SerialInputOutputManager
@@ -23,7 +25,12 @@ class UsbCommandManager(
     private var buffer = StringBuilder()
 
     fun connect(device: UsbDevice, manager: UsbManager): Boolean {
-        val availableDrivers = UsbSerialProber.getDefaultProber().findAllDrivers(manager)
+        // Добавляем наш кастомный VID/PID в список поддерживаемых устройств CDC
+        val customTable = ProbeTable()
+        customTable.addProduct(0x1337, 0x0002, CdcAcmSerialDriver::class.java)
+        val prober = UsbSerialProber(customTable)
+        
+        val availableDrivers = prober.findAllDrivers(manager)
         if (availableDrivers.isEmpty()) {
             logCallback("USB: ошибка открытия (драйвер не найден)")
             return false
