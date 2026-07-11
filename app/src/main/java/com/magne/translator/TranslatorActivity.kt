@@ -82,25 +82,24 @@ class TranslatorActivity : Activity(), RecognitionListener, TextToSpeech.OnInitL
     }
 
     override fun onResult(hypothesis: String?) {
-        hypothesis?.let {
-            try {
-                val json = JSONObject(it)
-                val text = json.getString("text")
-                if (text.isNotEmpty()) {
-                    tvRecognized.text = text
-                    val translation = translatorManager.translate(text)
-                    if (translation != null) {
-                        tvTranslated.text = translation
-                        tts?.speak(translation, TextToSpeech.QUEUE_FLUSH, null, null)
-                        tvStatus.text = "Переведено!"
-                    } else {
-                        tvTranslated.text = ""
-                        tvStatus.text = "Нет в словаре"
-                    }
+        if (hypothesis == null) return
+        try {
+            val json = JSONObject(hypothesis)
+            val text = json.getString("text")
+            if (text.isNotEmpty()) {
+                tvRecognized.text = text
+                val translation = translatorManager.translate(text)
+                if (translation != null) {
+                    tvTranslated.text = translation
+                    tts?.speak(translation, TextToSpeech.QUEUE_FLUSH, null, null)
+                    tvStatus.text = "Переведено!"
+                } else {
+                    tvTranslated.text = ""
+                    tvStatus.text = "Нет в словаре"
                 }
-            } catch (e: Exception) {
-                Log.e("Vosk", "JSON Parse error", e)
             }
+        } catch (e: Exception) {
+            Log.e("Vosk", "JSON Parse error", e)
         }
     }
 
