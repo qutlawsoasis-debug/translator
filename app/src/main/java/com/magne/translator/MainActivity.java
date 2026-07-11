@@ -32,7 +32,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(Bundle);
+        super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
         tvSource = findViewById(R.id.tvSource);
