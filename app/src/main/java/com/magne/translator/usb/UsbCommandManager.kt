@@ -1,6 +1,7 @@
 package com.magne.translator.usb
 
 import android.content.Context
+import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
@@ -10,7 +11,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class UsbCommandManager(private val context: Context) : SerialInputOutputManager.Listener {
+class UsbCommandManager(
+    private val context: Context,
+    private val logCallback: (String) -> Unit
+) : SerialInputOutputManager.Listener {
 
     private var serialPort: UsbSerialPort? = null
     private var ioManager: SerialInputOutputManager? = null
@@ -18,29 +22,39 @@ class UsbCommandManager(private val context: Context) : SerialInputOutputManager
     private val scope = CoroutineScope(Dispatchers.IO)
     private var buffer = StringBuilder()
 
-    fun connect(): Boolean {
-        val manager = context.getSystemService(Context.USB_SERVICE) as UsbManager
+    fun connect(device: UsbDevice, manager: UsbManager): Boolean {
         val availableDrivers = UsbSerialProber.getDefaultProber().findAllDrivers(manager)
-        
         if (availableDrivers.isEmpty()) {
+            logCallback("USB: ошибка открытия (драйвер не найден)")
             return false
         }
 
-        // Берем первый доступный драйвер (наша плата)
-        val driver = availableDrivers[0]
-        val connection = manager.openDevice(driver.device) ?: return false
+        val driver = availableDrivers.find { it.device.deviceId == device.deviceId }
+        if (driver == null) {
+            logCallback("USB: ошибка открытия (устройство не поддерживается)")
+            return false
+        }
+
+        val connection = manager.openDevice(driver.device)
+        if (connection == null) {
+            logCallback("USB: ошибка открытия (openDevice вернул null)")
+            return false
+        }
 
         serialPort = driver.ports[0]
-        try {
+        return try {
             serialPort?.open(connection)
             serialPort?.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
             
             ioManager = SerialInputOutputManager(serialPort, this)
             ioManager?.start()
-            return true
+            
+            logCallback("USB: порт открыт")
+            true
         } catch (e: Exception) {
+            logCallback("USB: ошибка открытия (${e.message})")
             e.printStackTrace()
-            return false
+            false
         }
     }
 
@@ -51,8 +65,10 @@ class UsbCommandManager(private val context: Context) : SerialInputOutputManager
     fun send(response: String) {
         val data = "$response\n".toByteArray()
         try {
+            logCallback("→ отправлено: $response")
             serialPort?.write(data, 1000)
         } catch (e: Exception) {
+            logCallback("→ ошибка отправки: ${e.message}")
             e.printStackTrace()
         }
     }
@@ -68,6 +84,7 @@ class UsbCommandManager(private val context: Context) : SerialInputOutputManager
                 buffer.delete(0, newlineIndex + 1)
                 
                 if (command.isNotEmpty()) {
+                    logCallback("← получено: $command")
                     scope.launch {
                         withContext(Dispatchers.Main) {
                             commandCallback?.invoke(command)
