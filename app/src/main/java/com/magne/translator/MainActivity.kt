@@ -65,19 +65,6 @@ class MainActivity : Activity() {
             val intent = Intent(this, TranslatorActivity::class.java)
             startActivity(intent)
         }
-
-        usbManager.startListening { command ->
-            Log.d("USB", "Received: $command")
-            when (command) {
-                "CHECK_UPDATE" -> usbManager.send("UPDATE_NONE")
-                "CHECK_MODELS" -> usbManager.send("MODELS_OK")
-                "START_TRANSLATOR" -> {
-                    val intent = Intent(this, TranslatorActivity::class.java)
-                    startActivity(intent)
-                }
-                "CLOSE" -> finishAffinity()
-            }
-        }
         
         val filter = IntentFilter(ACTION_USB_PERMISSION)
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
@@ -112,8 +99,25 @@ class MainActivity : Activity() {
     private fun connectToDevice(device: UsbDevice) {
         if (usbManager.connect(device, systemUsbManager)) {
             findViewById<TextView>(R.id.tvSource).text = "Связь установлена!"
-            Log.d("USB", "Sending APP_READY")
-            usbManager.send("APP_READY")
+            
+            // СНАЧАЛА startListening, ПОТОМ send
+            usbManager.startListening { command ->
+                Log.d("USB", "Received: $command")
+                runOnUiThread {
+                    when (command) {
+                        "HELLO" -> usbManager.send("APP_READY")
+                        "CHECK_UPDATE" -> usbManager.send("UPDATE_NONE")
+                        "CHECK_MODELS" -> usbManager.send("MODELS_OK")
+                        "START_TRANSLATOR" -> {
+                            val intent = Intent(this, TranslatorActivity::class.java)
+                            startActivity(intent)
+                        }
+                        "CLOSE" -> finishAffinity()
+                    }
+                }
+            }
+            Log.d("USB", "Sending APP_READY as fallback")
+            usbManager.send("APP_READY") // Оставляем на случай, если HELLO не придет
         }
     }
 
