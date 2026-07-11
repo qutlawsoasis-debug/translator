@@ -36,7 +36,6 @@
         android:backgroundTint="#4CAF50"
         android:textColor="#FFFFFF"
         android:textSize="18sp"
-        android:textStyle="bold"
-        android:cornerRadius="30dp" />
+        android:textStyle="bold" />
 
 </LinearLayout>
