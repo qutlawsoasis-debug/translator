@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Espressif ESP32-S3 (TinyUSB/Native USB) -->
+    <usb-device vendor-id="12346" product-id="4097" />
+    <usb-device vendor-id="12346" />
+</resources>
