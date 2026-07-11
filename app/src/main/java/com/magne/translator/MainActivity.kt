@@ -29,7 +29,7 @@ class MainActivity : Activity() {
         tvSource.text = "Приложение успешно перехвачено!"
 
         // Обработчик для кнопки "Начать"
-        val btnStart = findViewById<android.widget.Button>(R.id.btnStart)
+        val btnStart = findViewById<android.widget.Button>(R.id.btnListen)
         btnStart.setOnClickListener {
             android.widget.Toast.makeText(this, "Переход на экран перевода...", android.widget.Toast.LENGTH_SHORT).show()
         }
