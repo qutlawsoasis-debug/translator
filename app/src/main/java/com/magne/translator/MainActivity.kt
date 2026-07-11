@@ -13,12 +13,19 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Button
 import android.widget.TextView
+import android.app.AlertDialog
 import com.magne.translator.usb.UsbCommandManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : Activity() {
 
     private lateinit var usbManager: UsbCommandManager
     private lateinit var systemUsbManager: UsbManager
+    private val mainScope = CoroutineScope(Dispatchers.Main)
+    private val updateManager by lazy { UpdateManager(this) }
+    private var updateResult: UpdateResult? = null
 
     companion object {
         private const val ACTION_USB_PERMISSION = "com.magne.translator.USB_PERMISSION"
@@ -109,8 +116,34 @@ class MainActivity : Activity() {
                             usbManager.send("APP_READY")
                         }
                         "CHECK_UPDATE" -> {
-                            Log.d("USB", "Получили CHECK_UPDATE, отвечаем UPDATE_NONE")
-                            usbManager.send("UPDATE_NONE")
+                            Log.d("USB", "Получили CHECK_UPDATE, проверяем обновления")
+                            mainScope.launch {
+                                updateResult = updateManager.checkUpdate()
+                                if (updateResult != null) {
+                                    usbManager.send("UPDATE_AVAILABLE")
+                                } else {
+                                    usbManager.send("UPDATE_NONE")
+                                }
+                            }
+                        }
+                        "SHOW_UPDATE_DIALOG" -> {
+                            Log.d("USB", "Получили SHOW_UPDATE_DIALOG, показываем диалог")
+                            updateResult?.let { result ->
+                                AlertDialog.Builder(this@MainActivity)
+                                    .setTitle("Доступно обновление!")
+                                    .setMessage("Новая версия: ${result.version}. Установить сейчас?")
+                                    .setPositiveButton("Да") { _, _ ->
+                                        updateManager.downloadAndInstall(result)
+                                    }
+                                    .setNegativeButton("Позже") { _, _ ->
+                                        // Продолжаем обычный флоу
+                                        usbManager.send("UPDATE_NONE")
+                                    }
+                                    .setCancelable(false)
+                                    .show()
+                            } ?: run {
+                                usbManager.send("UPDATE_NONE")
+                            }
                         }
                         "CHECK_MODELS" -> {
                             Log.d("USB", "Получили CHECK_MODELS, отвечаем MODELS_OK")
