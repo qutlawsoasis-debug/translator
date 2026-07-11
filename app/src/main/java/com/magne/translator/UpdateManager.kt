@@ -7,7 +7,10 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import android.widget.Toast
 import androidx.core.content.FileProvider
 import org.json.JSONObject
 import java.io.File
@@ -85,6 +88,9 @@ class UpdateManager(private val context: Context) {
 
     private fun installApk(file: File) {
         try {
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(context, "Запуск установки обновления...", Toast.LENGTH_LONG).show()
+            }
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, "application/vnd.android.package-archive")
