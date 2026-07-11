@@ -8,13 +8,16 @@ import android.content.IntentFilter
 import android.hardware.usb.UsbManager
 import android.os.Bundle
 import android.widget.TextView
+import com.magne.translator.usb.UsbCommandManager
 
 class MainActivity : Activity() {
+
+    private lateinit var usbManager: UsbCommandManager
 
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (UsbManager.ACTION_USB_DEVICE_DETACHED == intent.action) {
-                // Если плата вытащена, немедленно закрываем приложение
+                usbManager.disconnect()
                 finishAffinity()
             }
         }
@@ -24,27 +27,55 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Меняем текст, чтобы пользователь понял, что мы перешли на Stage 2
-        val tvSource = findViewById<TextView>(R.id.tvSource)
-        tvSource.text = "Приложение успешно перехвачено!"
+        usbManager = UsbCommandManager(this)
 
-        // Обработчик для кнопки "Начать"
+        val tvSource = findViewById<TextView>(R.id.tvSource)
+        tvSource.text = "Подключение к плате..."
+
+        // Обработчик для кнопки "Начать" (Fallback)
         val btnStart = findViewById<android.widget.Button>(R.id.btnListen)
         btnStart.setOnClickListener {
             val intent = Intent(this, TranslatorActivity::class.java)
             startActivity(intent)
         }
+
+        usbManager.startListening { command ->
+            when (command) {
+                "CHECK_UPDATE" -> {
+                    // Пока нет логики обновлений, сразу говорим, что их нет
+                    usbManager.send("UPDATE_NONE")
+                }
+                "CHECK_MODELS" -> {
+                    // Пока нет проверки моделей, говорим, что всё ок
+                    usbManager.send("MODELS_OK")
+                }
+                "START_TRANSLATOR" -> {
+                    val intent = Intent(this, TranslatorActivity::class.java)
+                    startActivity(intent)
+                }
+                "CLOSE" -> {
+                    finishAffinity()
+                }
+            }
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        // Регистрируем слушатель отключения USB (начиная с Android 13 нужно указывать флаг, но тут просто)
         val filter = IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED)
         registerReceiver(usbReceiver, filter)
+
+        // Пытаемся подключиться к плате и отправляем APP_READY
+        if (usbManager.connect()) {
+            val tvSource = findViewById<TextView>(R.id.tvSource)
+            tvSource.text = "Связь установлена!"
+            usbManager.send("APP_READY")
+        }
     }
 
     override fun onPause() {
         super.onPause()
         unregisterReceiver(usbReceiver)
+        usbManager.disconnect()
     }
 }
