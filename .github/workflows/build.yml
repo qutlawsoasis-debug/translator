@@ -44,13 +44,20 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Extract Version
+      if: github.ref == 'refs/heads/main'
+      id: extract_version
+      run: |
+        VERSION=$(grep -oP 'versionName "\K[^"]+' app/build.gradle)
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
     - name: Create Release
       if: github.ref == 'refs/heads/main'
       uses: softprops/action-gh-release@v2
       with:
         files: app/build/outputs/apk/debug/*.apk
         tag_name: latest
-        name: Latest Release
+        name: ${{ steps.extract_version.outputs.version }}
         body: |
           TalkSync APK (Автоматическая сборка)
       env:
