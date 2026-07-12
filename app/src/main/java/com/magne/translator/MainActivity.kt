@@ -14,6 +14,7 @@ import android.util.Log
 import android.widget.Button
 import android.widget.TextView
 import android.app.AlertDialog
+import android.app.ProgressDialog
 import com.magne.translator.usb.UsbCommandManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -132,8 +133,20 @@ class MainActivity : Activity() {
                         "SHOW_UPDATE_DIALOG" -> {
                             Log.d("USB", "Получили SHOW_UPDATE_DIALOG, запускаем тихое обновление")
                             updateResult?.let { result ->
+                                @Suppress("DEPRECATION")
+                                val progressDialog = ProgressDialog(this@MainActivity).apply {
+                                    setTitle("Обновление")
+                                    setMessage("Загрузка версии ${result.version}...")
+                                    setProgressStyle(ProgressDialog.STYLE_HORIZONTAL)
+                                    max = 100
+                                    setCancelable(false)
+                                    show()
+                                }
                                 mainScope.launch {
-                                    updateManager.downloadAndInstallSilent(result)
+                                    updateManager.downloadAndInstallSilent(result) { progress ->
+                                        runOnUiThread { progressDialog.progress = progress }
+                                    }
+                                    runOnUiThread { progressDialog.dismiss() }
                                 }
                             } ?: run {
                                 usbManager.send("UPDATE_NONE")

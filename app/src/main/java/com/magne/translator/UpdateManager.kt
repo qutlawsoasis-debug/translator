@@ -4,12 +4,15 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
-import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
@@ -52,12 +55,8 @@ class UpdateManager(private val context: Context) {
         return@withContext null
     }
 
-    suspend fun downloadAndInstallSilent(updateResult: UpdateResult) = withContext(Dispatchers.IO) {
+    suspend fun downloadAndInstallSilent(updateResult: UpdateResult, onProgress: (Int) -> Unit) = withContext(Dispatchers.IO) {
         try {
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(context, "Установка обновления ${updateResult.version}...", Toast.LENGTH_LONG).show()
-            }
-
             var currentUrl = updateResult.downloadUrl
             var connection: HttpURLConnection
             var redirects = 0
@@ -78,34 +77,75 @@ class UpdateManager(private val context: Context) {
                 }
             }
 
-            val packageInstaller = context.packageManager.packageInstaller
-            val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
-            }
-            
-            val sessionId = packageInstaller.createSession(params)
-            val session = packageInstaller.openSession(sessionId)
+            val fileLength = connection.contentLength
+            val input = connection.inputStream
 
-            val out = session.openWrite("update", 0, -1)
-            connection.inputStream.use { input ->
-                out.use { output ->
-                    input.copyTo(output)
+            // Скачиваем во временный файл
+            val apkFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "update.apk")
+            val output = FileOutputStream(apkFile)
+
+            val data = ByteArray(4096)
+            var total: Long = 0
+            var count: Int
+            while (input.read(data).also { count = it } != -1) {
+                total += count
+                output.write(data, 0, count)
+                if (fileLength > 0) {
+                    val progress = (total * 100 / fileLength).toInt()
+                    onProgress(progress)
                 }
             }
-            session.fsync(out)
+            output.flush()
+            output.close()
+            input.close()
 
-            val intent = Intent(context, MainActivity::class.java)
-            val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
-            val pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or flag)
-            
-            session.commit(pendingIntent.intentSender)
-            session.close()
+            try {
+                // Пытаемся установить тихо (если Android 12+ и есть права)
+                val packageInstaller = context.packageManager.packageInstaller
+                val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+                }
+                
+                val sessionId = packageInstaller.createSession(params)
+                val session = packageInstaller.openSession(sessionId)
+
+                val out = session.openWrite("update", 0, apkFile.length())
+                apkFile.inputStream().use { it.copyTo(out) }
+                session.fsync(out)
+                out.close()
+
+                val intent = Intent(context, MainActivity::class.java)
+                val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+                val pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or flag)
+                
+                session.commit(pendingIntent.intentSender)
+                session.close()
+            } catch (e: SecurityException) {
+                // Нет прав на тихую установку, откатываемся к обычному диалогу
+                Log.e("UpdateManager", "Silent install forbidden, falling back to standard install", e)
+                fallbackToStandardInstall(apkFile)
+            }
+
         } catch (e: Exception) {
-            Log.e("UpdateManager", "Failed to start silent install", e)
+            Log.e("UpdateManager", "Failed to download/install", e)
             Handler(Looper.getMainLooper()).post {
                 Toast.makeText(context, "Ошибка обновления", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    private fun fallbackToStandardInstall(file: File) {
+        try {
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Log.e("UpdateManager", "Failed to start fallback install intent", e)
         }
     }
 }
