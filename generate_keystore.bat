@@ -11,12 +11,19 @@ if exist release.jks (
     del release.jks
 )
 
-echo [i] Running keytool...
-keytool -genkey -v -keystore release.jks -alias translator -keyalg RSA -keysize 2048 -validity 10000 -storepass translator123 -keypass translator123 -dname "CN=Translator, OU=Dev, O=Oasis, L=City, S=State, C=RU"
+echo [i] Searching for keytool...
+set KEYTOOL=keytool
+if exist "C:\Program Files\Android\Android Studio\jbr\bin\keytool.exe" set KEYTOOL="C:\Program Files\Android\Android Studio\jbr\bin\keytool.exe"
+if exist "C:\Program Files\Android\Android Studio\jre\bin\keytool.exe" set KEYTOOL="C:\Program Files\Android\Android Studio\jre\bin\keytool.exe"
+if exist "C:\Program Files\Java\jdk-17\bin\keytool.exe" set KEYTOOL="C:\Program Files\Java\jdk-17\bin\keytool.exe"
+
+echo [i] Using keytool at: %KEYTOOL%
+%KEYTOOL% -genkey -v -keystore release.jks -alias translator -keyalg RSA -keysize 2048 -validity 10000 -storepass translator123 -keypass translator123 -dname "CN=Translator, OU=Dev, O=Oasis, L=City, S=State, C=RU"
 
 if not exist release.jks (
     echo.
-    echo [ERROR] Failed to create release.jks! Make sure Java is in your PATH.
+    echo [ERROR] Failed to create release.jks!
+    echo Please install Android Studio or Java, or add it to your PATH.
     pause
     exit /b 1
 )
