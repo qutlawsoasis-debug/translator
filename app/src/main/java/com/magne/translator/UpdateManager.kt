@@ -32,6 +32,9 @@ class UpdateManager(private val context: Context) {
                 val response = connection.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(response)
                 var tagName = json.getString("tag_name")
+                if (tagName == "latest") {
+                    tagName = json.optString("name", "latest")
+                }
                 if (tagName.startsWith("v")) tagName = tagName.substring(1) // Убираем 'v' если есть
                 
                 val currentVersion = BuildConfig.VERSION_NAME
@@ -100,33 +103,9 @@ class UpdateManager(private val context: Context) {
             output.close()
             input.close()
 
-            try {
-                // Пытаемся установить тихо (если Android 12+ и есть права)
-                val packageInstaller = context.packageManager.packageInstaller
-                val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
-                }
-                
-                val sessionId = packageInstaller.createSession(params)
-                val session = packageInstaller.openSession(sessionId)
-
-                val out = session.openWrite("update", 0, apkFile.length())
-                apkFile.inputStream().use { it.copyTo(out) }
-                session.fsync(out)
-                out.close()
-
-                val intent = Intent(context, MainActivity::class.java)
-                val flag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
-                val pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or flag)
-                
-                session.commit(pendingIntent.intentSender)
-                session.close()
-            } catch (e: SecurityException) {
-                // Нет прав на тихую установку, откатываемся к обычному диалогу
-                Log.e("UpdateManager", "Silent install forbidden, falling back to standard install", e)
-                fallbackToStandardInstall(apkFile)
-            }
+            // Сразу вызываем стандартный диалог установки, 
+            // так как тихая установка не работает для приложений не из маркета
+            fallbackToStandardInstall(apkFile)
 
         } catch (e: Exception) {
             Log.e("UpdateManager", "Failed to download/install", e)

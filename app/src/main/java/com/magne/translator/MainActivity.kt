@@ -131,22 +131,32 @@ class MainActivity : Activity() {
                             }
                         }
                         "SHOW_UPDATE_DIALOG" -> {
-                            Log.d("USB", "Получили SHOW_UPDATE_DIALOG, запускаем тихое обновление")
+                            Log.d("USB", "Получили SHOW_UPDATE_DIALOG, показываем кастомный диалог")
                             updateResult?.let { result ->
-                                @Suppress("DEPRECATION")
-                                val progressDialog = ProgressDialog(this@MainActivity).apply {
-                                    setTitle("Обновление")
-                                    setMessage("Загрузка версии ${result.version}...")
-                                    setProgressStyle(ProgressDialog.STYLE_HORIZONTAL)
-                                    max = 100
-                                    setCancelable(false)
-                                    show()
-                                }
+                                val dialogView = layoutInflater.inflate(R.layout.dialog_update, null)
+                                val tvUpdateTitle = dialogView.findViewById<TextView>(R.id.tvUpdateTitle)
+                                val pbUpdate = dialogView.findViewById<android.widget.ProgressBar>(R.id.pbUpdate)
+                                val tvUpdateProgress = dialogView.findViewById<TextView>(R.id.tvUpdateProgress)
+                                
+                                tvUpdateTitle.text = "Загрузка версии ${result.version}..."
+                                
+                                val updateDialog = AlertDialog.Builder(this@MainActivity)
+                                    .setView(dialogView)
+                                    .setCancelable(false)
+                                    .create()
+                                
+                                // Убираем белый фон по умолчанию, чтобы темная карточка смотрелась красиво
+                                updateDialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+                                updateDialog.show()
+                                
                                 mainScope.launch {
                                     updateManager.downloadAndInstallSilent(result) { progress ->
-                                        runOnUiThread { progressDialog.progress = progress }
+                                        runOnUiThread { 
+                                            pbUpdate.progress = progress
+                                            tvUpdateProgress.text = "$progress%" 
+                                        }
                                     }
-                                    runOnUiThread { progressDialog.dismiss() }
+                                    runOnUiThread { updateDialog.dismiss() }
                                 }
                             } ?: run {
                                 usbManager.send("UPDATE_NONE")
