@@ -35,6 +35,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvAppName: TextView
     private lateinit var tvVersion: TextView
     private lateinit var progressBar: CircularProgressIndicator
+    
+    private var isTranslatorRunning = false
 
     companion object {
         private const val ACTION_USB_PERMISSION = "com.magne.translator.USB_PERMISSION"
@@ -128,8 +130,12 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     when (command) {
                         "HELLO" -> {
-                            Log.d("USB", "Получили HELLO, отвечаем APP_READY")
-                            usbManager.send("APP_READY")
+                            if (!isTranslatorRunning) {
+                                Log.d("USB", "Получили HELLO, отвечаем APP_READY")
+                                usbManager.send("APP_READY")
+                            } else {
+                                Log.d("USB", "Получили HELLO, но переводчик уже запущен. Игнорируем.")
+                            }
                         }
                         "CHECK_UPDATE" -> {
                             tvStatus.text = "Проверка обновлений..."
@@ -182,6 +188,7 @@ class MainActivity : AppCompatActivity() {
                         "START_TRANSLATOR" -> {
                             tvStatus.text = "Запуск переводчика..."
                             Log.d("USB", "Получили START_TRANSLATOR, запускаем активити")
+                            isTranslatorRunning = true
                             val prefs = getSharedPreferences("AppPrefs", android.content.Context.MODE_PRIVATE)
                             if (prefs.contains("pref_from_lang") && prefs.contains("pref_to_lang")) {
                                 val intent = Intent(this@MainActivity, TranslatorActivity::class.java)

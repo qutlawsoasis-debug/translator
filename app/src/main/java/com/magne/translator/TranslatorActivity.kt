@@ -94,12 +94,33 @@ class TranslatorActivity : AppCompatActivity(), RecognitionListener, TextToSpeec
         )
     }
 
+    private fun getLanguageName(code: String): String {
+        return when (code) {
+            TranslateLanguage.RUSSIAN -> "Русский"
+            TranslateLanguage.ENGLISH -> "Английский"
+            TranslateLanguage.GERMAN -> "Немецкий"
+            TranslateLanguage.FRENCH -> "Французский"
+            TranslateLanguage.SPANISH -> "Испанский"
+            TranslateLanguage.ITALIAN -> "Итальянский"
+            TranslateLanguage.CHINESE -> "Китайский"
+            TranslateLanguage.KOREAN -> "Корейский"
+            TranslateLanguage.JAPANESE -> "Японский"
+            TranslateLanguage.PORTUGUESE -> "Португальский"
+            else -> "Неизвестный"
+        }
+    }
+
     private fun startRecognition(model: Model) {
         try {
             val recognizer = Recognizer(model, 16000.0f)
+            recognizer.setMaxAlternatives(3)
+            recognizer.setWords(true)
             speechService = SpeechService(recognizer, 16000.0f)
             speechService?.startListening(this)
-            tvStatus.text = "Говорите..."
+            
+            val fromLang = intent.getStringExtra("from_lang") ?: TranslateLanguage.RUSSIAN
+            val langName = getLanguageName(fromLang)
+            tvStatus.text = "🎙 Говорите на: $langName"
         } catch (e: IOException) {
             tvStatus.text = "Ошибка микрофона"
         }
@@ -109,9 +130,23 @@ class TranslatorActivity : AppCompatActivity(), RecognitionListener, TextToSpeec
         if (hypothesis == null) return
         try {
             val json = JSONObject(hypothesis)
-            val partial = json.getString("partial")
-            if (partial.isNotEmpty()) {
-                tvRecognized.text = partial + "..."
+            if (json.has("partial_result")) {
+                val words = json.getJSONArray("partial_result")
+                val filteredText = StringBuilder()
+                for (i in 0 until words.length()) {
+                    val wordObj = words.getJSONObject(i)
+                    if (wordObj.has("conf") && wordObj.getDouble("conf") > 0.7) {
+                        filteredText.append(wordObj.getString("word")).append(" ")
+                    }
+                }
+                if (filteredText.isNotEmpty()) {
+                    tvRecognized.text = filteredText.toString().trim() + "..."
+                }
+            } else if (json.has("partial")) {
+                val partial = json.getString("partial")
+                if (partial.isNotEmpty()) {
+                    tvRecognized.text = partial + "..."
+                }
             }
         } catch (e: Exception) {
             // Игнорируем
@@ -122,19 +157,33 @@ class TranslatorActivity : AppCompatActivity(), RecognitionListener, TextToSpeec
         if (hypothesis == null) return
         try {
             val json = JSONObject(hypothesis)
-            val text = json.getString("text")
-            if (text.isNotEmpty()) {
-                tvRecognized.text = text
+            var textToTranslate = ""
+            
+            if (json.has("alternatives")) {
+                val alternatives = json.getJSONArray("alternatives")
+                if (alternatives.length() > 0) {
+                    textToTranslate = alternatives.getJSONObject(0).getString("text")
+                }
+            } else if (json.has("text")) {
+                textToTranslate = json.getString("text")
+            }
+            
+            if (textToTranslate.isNotEmpty()) {
+                tvRecognized.text = textToTranslate
                 tvStatus.text = "Перевожу..."
-                translatorManager.translate(text,
+                translatorManager.translate(textToTranslate,
                     onSuccess = { translation ->
-                        tvTranslated.text = translation
+                        runOnUiThread { 
+                            tvTranslated.text = translation
+                            tvStatus.text = "Переведено!"
+                        }
                         tts?.speak(translation, TextToSpeech.QUEUE_FLUSH, null, null)
-                        tvStatus.text = "Переведено!"
                     },
                     onError = { e ->
-                        tvTranslated.text = ""
-                        tvStatus.text = "Ошибка перевода"
+                        runOnUiThread {
+                            tvTranslated.text = ""
+                            tvStatus.text = "Ошибка перевода"
+                        }
                         Log.e("MLKit", "Translation failed", e)
                     }
                 )
