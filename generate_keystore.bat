@@ -1,66 +1,64 @@
 @echo off
-chcp 65001 >nul
 setlocal
 
 echo =========================================================
-echo === Генерация постоянного ключа для Android (release.jks) ===
+echo GENERATING RELEASE.JKS KEYSTORE
 echo =========================================================
 echo.
 
 if exist release.jks (
-    echo [i] Файл release.jks уже существует! Удаляю старый...
+    echo [i] release.jks already exists! Deleting old one...
     del release.jks
 )
 
-echo [i] Запускаю keytool...
+echo [i] Running keytool...
 keytool -genkey -v -keystore release.jks -alias translator -keyalg RSA -keysize 2048 -validity 10000 -storepass translator123 -keypass translator123 -dname "CN=Translator, OU=Dev, O=Oasis, L=City, S=State, C=RU"
 
 if not exist release.jks (
     echo.
-    echo [ОШИБКА] Не удалось создать release.jks! Убедитесь, что Java (keytool) установлена и прописана в PATH.
+    echo [ERROR] Failed to create release.jks! Make sure Java is in your PATH.
     pause
     exit /b 1
 )
 
 echo.
-echo [i] Конвертация release.jks в Base64...
-powershell -Command "[Convert]::ToBase64String([IO.File]::ReadAllBytes('release.jks')) | Set-Clipboard"
-echo [OK] Base64 строка успешно скопирована в буфер обмена!
+echo [i] Converting release.jks to Base64...
+powershell -Command "$b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes('release.jks')); Set-Clipboard -Value $b64"
+echo [OK] Base64 string successfully copied to clipboard!
 
 echo.
-echo [i] Открываю страницу GitHub Secrets в браузере...
+echo [i] Opening GitHub Secrets page in browser...
 start https://github.com/qutlawsoasis-debug/translator/settings/secrets/actions
 
 echo.
 echo =========================================================
-echo В браузере нажмите "New repository secret" и добавьте 4 секрета:
+echo In your browser, click "New repository secret" and add:
 echo.
-echo СЕКРЕТ 1:
-echo Название: KEYSTORE_BASE64
-echo Значение: (нажмите Ctrl+V, чтобы вставить длинную строку из буфера)
-echo.
-pause
-
-echo.
-echo СЕКРЕТ 2:
-echo Название: KEY_ALIAS
-echo Значение: translator
+echo SECRET 1:
+echo Name: KEYSTORE_BASE64
+echo Value: (Press Ctrl+V to paste from clipboard)
 echo.
 pause
 
 echo.
-echo СЕКРЕТ 3:
-echo Название: KEY_PASSWORD
-echo Значение: translator123
+echo SECRET 2:
+echo Name: KEY_ALIAS
+echo Value: translator
 echo.
 pause
 
 echo.
-echo СЕКРЕТ 4:
-echo Название: STORE_PASSWORD
-echo Значение: translator123
+echo SECRET 3:
+echo Name: KEY_PASSWORD
+echo Value: translator123
+echo.
+pause
+
+echo.
+echo SECRET 4:
+echo Name: STORE_PASSWORD
+echo Value: translator123
 echo.
 echo =========================================================
-echo Готово! Теперь при каждой сборке приложение будет подписываться 
-echo вашим ключом. Ошибка установки поверх старой версии решена!
+echo Done! Next time you build, it will use this new keystore.
 pause
