@@ -45,7 +45,26 @@ jobs:
         if [ -f release.jks ]; then
           export KEYSTORE_FILE="$(pwd)/release.jks"
         fi
-        gradle assembleDebug
+        if gradle assembleDebug; then
+          echo "Build succeeded"
+        else
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          git checkout -b build-logs
+          git add app/.cxx/**/*.txt app/.cxx/**/*.log -f
+          git commit -m "Upload build logs" || true
+          git push origin build-logs -f || true
+          exit 1
+        fi
+
+    - name: Upload Build Reports
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-reports
+        path: |
+          app/build/reports/
+          app/.cxx/
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
