@@ -38,12 +38,28 @@ jobs:
     - name: Download libsentencepiece.so from RTranslator
       run: |
         mkdir -p app/src/main/jniLibs/arm64-v8a
-        curl -L "https://github.com/niedev/RTranslator/releases/download/2.1.5/RTranslator.apk" \
-          -o /tmp/rtranslator.apk
-        cd /tmp && unzip -o rtranslator.apk "lib/arm64-v8a/libsentencepiece.so"
+        
+        # Скачиваем APK с явными редиректами и user-agent
+        curl -L \
+          --user-agent "Mozilla/5.0" \
+          --max-redirs 10 \
+          -o /tmp/rtranslator.apk \
+          "https://github.com/niedev/RTranslator/releases/download/2.1.5/RTranslator.apk"
+        
+        # Проверяем что скачалось
+        echo "Downloaded file size:"
+        ls -lh /tmp/rtranslator.apk
+        file /tmp/rtranslator.apk
+        
+        # Распаковываем .so из APK
+        cd /tmp
+        unzip -o rtranslator.apk "lib/arm64-v8a/libsentencepiece.so"
+        
+        # Копируем в проект
         cp /tmp/lib/arm64-v8a/libsentencepiece.so \
           $GITHUB_WORKSPACE/app/src/main/jniLibs/arm64-v8a/libsentencepiece.so
-        echo "libsentencepiece.so size:"
+        
+        echo "Result:"
         ls -lh $GITHUB_WORKSPACE/app/src/main/jniLibs/arm64-v8a/
 
     - name: Build with Gradle
