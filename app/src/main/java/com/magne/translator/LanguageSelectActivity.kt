@@ -1,46 +1,57 @@
 package com.magne.translator
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
+import android.view.LayoutInflater
 import android.view.View
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
+import android.view.ViewGroup
 import android.widget.Button
-import android.widget.ProgressBar
-import android.widget.Spinner
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.TranslateRemoteModel
 
-data class LanguageItem(val name: String, val code: String)
+data class LanguageItem(val name: String, val code: String, val emoji: String)
 
-class LanguageSelectActivity : Activity() {
+class LanguageSelectActivity : AppCompatActivity() {
 
     private val languages = listOf(
-        LanguageItem("Русский", TranslateLanguage.RUSSIAN),
-        LanguageItem("Английский", TranslateLanguage.ENGLISH),
-        LanguageItem("Немецкий", TranslateLanguage.GERMAN),
-        LanguageItem("Французский", TranslateLanguage.FRENCH),
-        LanguageItem("Испанский", TranslateLanguage.SPANISH),
-        LanguageItem("Итальянский", TranslateLanguage.ITALIAN),
-        LanguageItem("Китайский", TranslateLanguage.CHINESE),
-        LanguageItem("Корейский", TranslateLanguage.KOREAN),
-        LanguageItem("Японский", TranslateLanguage.JAPANESE),
-        LanguageItem("Португальский", TranslateLanguage.PORTUGUESE)
+        LanguageItem("Русский", TranslateLanguage.RUSSIAN, "🇷🇺"),
+        LanguageItem("Английский", TranslateLanguage.ENGLISH, "🇬🇧"),
+        LanguageItem("Немецкий", TranslateLanguage.GERMAN, "🇩🇪"),
+        LanguageItem("Французский", TranslateLanguage.FRENCH, "🇫🇷"),
+        LanguageItem("Испанский", TranslateLanguage.SPANISH, "🇪🇸"),
+        LanguageItem("Итальянский", TranslateLanguage.ITALIAN, "🇮🇹"),
+        LanguageItem("Китайский", TranslateLanguage.CHINESE, "🇨🇳"),
+        LanguageItem("Корейский", TranslateLanguage.KOREAN, "🇰🇷"),
+        LanguageItem("Японский", TranslateLanguage.JAPANESE, "🇯🇵"),
+        LanguageItem("Португальский", TranslateLanguage.PORTUGUESE, "🇵🇹")
     )
 
-    private lateinit var spinnerSource: Spinner
-    private lateinit var spinnerTarget: Spinner
+    private lateinit var cardSource: LinearLayout
+    private lateinit var cardTarget: LinearLayout
+    private lateinit var tvSourceEmoji: TextView
+    private lateinit var tvSourceName: TextView
+    private lateinit var tvTargetEmoji: TextView
+    private lateinit var tvTargetName: TextView
     private lateinit var tvSourceStatus: TextView
     private lateinit var tvTargetStatus: TextView
     private lateinit var btnStart: Button
-    private lateinit var progressBar: ProgressBar
+    private lateinit var progressBar: LinearProgressIndicator
+
+    private var sourceLang: LanguageItem = languages[0]
+    private var targetLang: LanguageItem = languages[1]
 
     private val modelManager = RemoteModelManager.getInstance()
 
@@ -48,92 +59,97 @@ class LanguageSelectActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_language_select)
 
-        spinnerSource = findViewById(R.id.spinnerSource)
-        spinnerTarget = findViewById(R.id.spinnerTarget)
+        cardSource = findViewById(R.id.cardSource)
+        cardTarget = findViewById(R.id.cardTarget)
+        tvSourceEmoji = findViewById(R.id.tvSourceEmoji)
+        tvSourceName = findViewById(R.id.tvSourceName)
+        tvTargetEmoji = findViewById(R.id.tvTargetEmoji)
+        tvTargetName = findViewById(R.id.tvTargetName)
         tvSourceStatus = findViewById(R.id.tvSourceStatus)
         tvTargetStatus = findViewById(R.id.tvTargetStatus)
         btnStart = findViewById(R.id.btnStart)
         progressBar = findViewById(R.id.progressBar)
 
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, languages.map { it.name })
-        spinnerSource.adapter = adapter
-        spinnerTarget.adapter = adapter
-
-        // Load saved preferences if any
         val prefs = getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
         val savedSource = prefs.getString("pref_from_lang", TranslateLanguage.RUSSIAN)
         val savedTarget = prefs.getString("pref_to_lang", TranslateLanguage.ENGLISH)
 
-        spinnerSource.setSelection(languages.indexOfFirst { it.code == savedSource }.takeIf { it >= 0 } ?: 0)
-        spinnerTarget.setSelection(languages.indexOfFirst { it.code == savedTarget }.takeIf { it >= 0 } ?: 1)
+        sourceLang = languages.find { it.code == savedSource } ?: languages[0]
+        targetLang = languages.find { it.code == savedTarget } ?: languages[1]
 
-        val itemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                checkModelsStatus()
-            }
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
+        updateUI()
 
-        spinnerSource.onItemSelectedListener = itemSelectedListener
-        spinnerTarget.onItemSelectedListener = itemSelectedListener
+        cardSource.setOnClickListener { showLanguagePicker(true) }
+        cardTarget.setOnClickListener { showLanguagePicker(false) }
 
         btnStart.setOnClickListener {
-            val sourceIdx = spinnerSource.selectedItemPosition
-            val targetIdx = spinnerTarget.selectedItemPosition
-
-            if (sourceIdx == targetIdx) {
+            if (sourceLang.code == targetLang.code) {
                 Toast.makeText(this, "Выберите разные языки", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            val sourceLang = languages[sourceIdx]
-            val targetLang = languages[targetIdx]
-
-            // Save preferences
             prefs.edit()
                 .putString("pref_from_lang", sourceLang.code)
                 .putString("pref_to_lang", targetLang.code)
                 .apply()
 
-            downloadModelsAndStart(sourceLang.code, targetLang.code)
+            downloadModelsAndStart()
         }
     }
 
+    private fun updateUI() {
+        tvSourceEmoji.text = sourceLang.emoji
+        tvSourceName.text = sourceLang.name
+        tvTargetEmoji.text = targetLang.emoji
+        tvTargetName.text = targetLang.name
+        checkModelsStatus()
+    }
+
+    private fun showLanguagePicker(isSource: Boolean) {
+        val bottomSheetDialog = BottomSheetDialog(this)
+        val view = layoutInflater.inflate(R.layout.bottom_sheet_languages, null)
+        val recyclerView: RecyclerView = view.findViewById(R.id.rvLanguages)
+        
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        recyclerView.adapter = LanguageAdapter(languages) { selected ->
+            if (isSource) sourceLang = selected else targetLang = selected
+            bottomSheetDialog.dismiss()
+            updateUI()
+        }
+
+        bottomSheetDialog.setContentView(view)
+        bottomSheetDialog.show()
+    }
+
     private fun checkModelsStatus() {
-        val sourceIdx = spinnerSource.selectedItemPosition
-        val targetIdx = spinnerTarget.selectedItemPosition
-        if (sourceIdx < 0 || targetIdx < 0) return
-
-        val sourceLang = languages[sourceIdx]
-        val targetLang = languages[targetIdx]
-
         checkSingleModelStatus(sourceLang.code, tvSourceStatus)
         checkSingleModelStatus(targetLang.code, tvTargetStatus)
     }
 
     private fun checkSingleModelStatus(langCode: String, statusView: TextView) {
-        statusView.text = "Проверка..."
+        statusView.text = "⏳ Проверка..."
+        statusView.setTextColor(Color.parseColor("#AAAAAA"))
         val model = TranslateRemoteModel.Builder(langCode).build()
         modelManager.isModelDownloaded(model).addOnSuccessListener { isDownloaded ->
             if (isDownloaded) {
-                statusView.text = "✅ Модель готова"
-                statusView.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
+                statusView.text = "✅ Готово"
+                statusView.setTextColor(Color.parseColor("#4CAF50"))
             } else {
-                statusView.text = "⬇️ Нужно скачать ~30MB"
-                statusView.setTextColor(android.graphics.Color.parseColor("#FFC107"))
+                statusView.text = "⬇ ~30MB"
+                statusView.setTextColor(Color.parseColor("#FFC107"))
             }
         }.addOnFailureListener {
-            statusView.text = "❌ Ошибка проверки"
-            statusView.setTextColor(android.graphics.Color.parseColor("#F44336"))
+            statusView.text = "❌ Ошибка"
+            statusView.setTextColor(Color.parseColor("#F44336"))
         }
     }
 
-    private fun downloadModelsAndStart(sourceCode: String, targetCode: String) {
+    private fun downloadModelsAndStart() {
         btnStart.isEnabled = false
         progressBar.visibility = View.VISIBLE
 
-        val sourceModel = TranslateRemoteModel.Builder(sourceCode).build()
-        val targetModel = TranslateRemoteModel.Builder(targetCode).build()
+        val sourceModel = TranslateRemoteModel.Builder(sourceLang.code).build()
+        val targetModel = TranslateRemoteModel.Builder(targetLang.code).build()
         val conditions = DownloadConditions.Builder().build()
 
         var sourceDone = false
@@ -141,41 +157,59 @@ class LanguageSelectActivity : Activity() {
 
         fun checkAndStart() {
             if (sourceDone && targetDone) {
-                progressBar.visibility = View.GONE
+                progressBar.visibility = View.INVISIBLE
                 btnStart.isEnabled = true
-                
                 val intent = Intent(this, TranslatorActivity::class.java)
-                intent.putExtra("from_lang", sourceCode)
-                intent.putExtra("to_lang", targetCode)
+                intent.putExtra("from_lang", sourceLang.code)
+                intent.putExtra("to_lang", targetLang.code)
                 startActivity(intent)
                 finish()
             }
         }
 
-        modelManager.download(sourceModel, conditions)
-            .addOnSuccessListener {
-                sourceDone = true
-                checkSingleModelStatus(sourceCode, tvSourceStatus)
-                checkAndStart()
-            }
-            .addOnFailureListener { e ->
-                progressBar.visibility = View.GONE
-                btnStart.isEnabled = true
-                Toast.makeText(this, "Ошибка загрузки: ${e.message}", Toast.LENGTH_SHORT).show()
-                Log.e("LanguageSelect", "Failed to download source model", e)
-            }
+        modelManager.download(sourceModel, conditions).addOnSuccessListener {
+            sourceDone = true
+            checkSingleModelStatus(sourceLang.code, tvSourceStatus)
+            checkAndStart()
+        }.addOnFailureListener { e ->
+            progressBar.visibility = View.INVISIBLE
+            btnStart.isEnabled = true
+            Toast.makeText(this, "Ошибка загрузки", Toast.LENGTH_SHORT).show()
+        }
 
-        modelManager.download(targetModel, conditions)
-            .addOnSuccessListener {
-                targetDone = true
-                checkSingleModelStatus(targetCode, tvTargetStatus)
-                checkAndStart()
-            }
-            .addOnFailureListener { e ->
-                progressBar.visibility = View.GONE
-                btnStart.isEnabled = true
-                Toast.makeText(this, "Ошибка загрузки: ${e.message}", Toast.LENGTH_SHORT).show()
-                Log.e("LanguageSelect", "Failed to download target model", e)
-            }
+        modelManager.download(targetModel, conditions).addOnSuccessListener {
+            targetDone = true
+            checkSingleModelStatus(targetLang.code, tvTargetStatus)
+            checkAndStart()
+        }.addOnFailureListener { e ->
+            progressBar.visibility = View.INVISIBLE
+            btnStart.isEnabled = true
+            Toast.makeText(this, "Ошибка загрузки", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private inner class LanguageAdapter(
+        private val list: List<LanguageItem>,
+        private val onClick: (LanguageItem) -> Unit
+    ) : RecyclerView.Adapter<LanguageAdapter.ViewHolder>() {
+
+        inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+            val emoji: TextView = view.findViewById(R.id.tvItemEmoji)
+            val name: TextView = view.findViewById(R.id.tvItemName)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_language, parent, false)
+            return ViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val item = list[position]
+            holder.emoji.text = item.emoji
+            holder.name.text = item.name
+            holder.itemView.setOnClickListener { onClick(item) }
+        }
+
+        override fun getItemCount() = list.size
     }
 }

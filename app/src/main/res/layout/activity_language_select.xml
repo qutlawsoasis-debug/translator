@@ -1,84 +1,146 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:gravity="center"
+    android:gravity="center_horizontal"
     android:padding="24dp"
-    android:background="#121212">
+    android:background="#0D0D0D">
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Выберите языки"
         android:textColor="#FFFFFF"
-        android:textSize="28sp"
+        android:textSize="24sp"
         android:textAlignment="center"
-        android:layout_marginBottom="32dp" />
+        android:layout_marginTop="48dp"
+        android:layout_marginBottom="48dp" />
 
+    <!-- Исходный язык -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Говорит:"
         android:textColor="#AAAAAA"
-        android:textSize="16sp"
+        android:textSize="14sp"
         android:layout_marginBottom="8dp" />
 
-    <Spinner
-        android:id="@+id/spinnerSource"
+    <LinearLayout
+        android:id="@+id/cardSource"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:backgroundTint="#4CAF50"
-        android:layout_marginBottom="8dp" />
+        android:layout_height="64dp"
+        android:background="@drawable/bg_lang_card"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:clickable="true"
+        android:focusable="true">
+        <TextView
+            android:id="@+id/tvSourceEmoji"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🇷🇺"
+            android:textSize="24sp"
+            android:layout_marginEnd="16dp" />
+        <TextView
+            android:id="@+id/tvSourceName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Русский"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/tvSourceStatus"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="..."
-        android:textColor="#AAAAAA"
-        android:textSize="14sp"
-        android:layout_marginBottom="24dp" />
+        android:textSize="12sp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="16dp" />
 
+    <!-- Стрелка -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="↓"
+        android:textColor="#4CAF50"
+        android:textSize="32sp"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Целевой язык -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Переводить на:"
         android:textColor="#AAAAAA"
-        android:textSize="16sp"
+        android:textSize="14sp"
         android:layout_marginBottom="8dp" />
 
-    <Spinner
-        android:id="@+id/spinnerTarget"
+    <LinearLayout
+        android:id="@+id/cardTarget"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:backgroundTint="#4CAF50"
-        android:layout_marginBottom="8dp" />
+        android:layout_height="64dp"
+        android:background="@drawable/bg_lang_card"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:clickable="true"
+        android:focusable="true">
+        <TextView
+            android:id="@+id/tvTargetEmoji"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🇬🇧"
+            android:textSize="24sp"
+            android:layout_marginEnd="16dp" />
+        <TextView
+            android:id="@+id/tvTargetName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Английский"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/tvTargetStatus"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="..."
-        android:textColor="#AAAAAA"
-        android:textSize="14sp"
-        android:layout_marginBottom="32dp" />
+        android:textSize="12sp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="48dp" />
 
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- Кнопка и прогресс -->
     <Button
         android:id="@+id/btnStart"
         android:layout_width="match_parent"
-        android:layout_height="60dp"
+        android:layout_height="56dp"
         android:text="Начать"
-        android:textSize="18sp"
-        android:textColor="#FFFFFF"
-        android:backgroundTint="#4CAF50" />
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textColor="@color/color_btn_text"
+        android:background="@drawable/bg_btn_start"
+        app:backgroundTint="@null" />
 
-    <ProgressBar
+    <com.google.android.material.progressindicator.LinearProgressIndicator
         android:id="@+id/progressBar"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:visibility="gone"
-        android:indeterminateTint="#4CAF50" />
+        android:layout_marginTop="8dp"
+        android:visibility="invisible"
+        android:indeterminate="true"
+        app:indicatorColor="#4CAF50"
+        app:trackColor="#2A2A2A"
+        app:trackCornerRadius="2dp" />
 
 </LinearLayout>
