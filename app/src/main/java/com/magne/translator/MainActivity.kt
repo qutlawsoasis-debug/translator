@@ -13,20 +13,28 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Button
 import android.widget.TextView
+import android.widget.ImageView
 import android.app.AlertDialog
-import android.app.ProgressDialog
+import androidx.appcompat.app.AppCompatActivity
 import com.magne.translator.usb.UsbCommandManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.google.android.material.progressindicator.CircularProgressIndicator
 
-class MainActivity : Activity() {
+class MainActivity : AppCompatActivity() {
 
     private lateinit var usbManager: UsbCommandManager
     private lateinit var systemUsbManager: UsbManager
     private val mainScope = CoroutineScope(Dispatchers.Main)
     private val updateManager by lazy { UpdateManager(this) }
     private var updateResult: UpdateResult? = null
+
+    private lateinit var tvStatus: TextView
+    private lateinit var ivLogo: ImageView
+    private lateinit var tvAppName: TextView
+    private lateinit var tvVersion: TextView
+    private lateinit var progressBar: CircularProgressIndicator
 
     companion object {
         private const val ACTION_USB_PERMISSION = "com.magne.translator.USB_PERMISSION"
@@ -62,20 +70,23 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
 
         systemUsbManager = getSystemService(Context.USB_SERVICE) as UsbManager
-        
         usbManager = UsbCommandManager(this) { msg -> Log.d("USB", msg) }
 
-        val tvSource = findViewById<TextView>(R.id.tvSource)
-        tvSource.text = "Подключение к плате..."
+        tvStatus = findViewById(R.id.tvStatus)
+        ivLogo = findViewById(R.id.ivLogo)
+        tvAppName = findViewById(R.id.tvAppName)
+        tvVersion = findViewById(R.id.tvVersion)
+        progressBar = findViewById(R.id.progressBar)
 
-        val tvVersion = findViewById<TextView>(R.id.tvVersion)
-        tvVersion.text = "Версия: ${BuildConfig.VERSION_NAME}"
+        tvVersion.text = "Версия ${BuildConfig.VERSION_NAME}"
+        tvStatus.text = "Подключение к плате..."
 
-        val btnStart = findViewById<Button>(R.id.btnListen)
-        btnStart.setOnClickListener {
-            val intent = Intent(this, TranslatorActivity::class.java)
-            startActivity(intent)
-        }
+        // Animate elements (fade-in)
+        ivLogo.animate().alpha(1f).setDuration(800).start()
+        tvAppName.animate().alpha(1f).setDuration(800).setStartDelay(200).start()
+        tvVersion.animate().alpha(1f).setDuration(800).setStartDelay(400).start()
+        progressBar.animate().alpha(1f).setDuration(800).setStartDelay(600).start()
+        tvStatus.animate().alpha(1f).setDuration(800).setStartDelay(800).start()
         
         val filter = IntentFilter(ACTION_USB_PERMISSION)
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
@@ -104,12 +115,13 @@ class MainActivity : Activity() {
             }
         } else {
             Log.d("USB", "Плата не найдена в системе")
+            tvStatus.text = "Ожидание подключения..."
         }
     }
 
     private fun connectToDevice(device: UsbDevice) {
         if (usbManager.connect(device, systemUsbManager)) {
-            findViewById<TextView>(R.id.tvSource).text = "Связь установлена!"
+            tvStatus.text = "Связь установлена!"
             
             usbManager.startListening { command ->
                 Log.d("USB", "=> Обработка команды в UI потоке: [$command]")
@@ -120,6 +132,7 @@ class MainActivity : Activity() {
                             usbManager.send("APP_READY")
                         }
                         "CHECK_UPDATE" -> {
+                            tvStatus.text = "Проверка обновлений..."
                             Log.d("USB", "Получили CHECK_UPDATE, проверяем обновления")
                             mainScope.launch {
                                 updateResult = updateManager.checkUpdate()
@@ -145,7 +158,6 @@ class MainActivity : Activity() {
                                     .setCancelable(false)
                                     .create()
                                 
-                                // Убираем белый фон по умолчанию, чтобы темная карточка смотрелась красиво
                                 updateDialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
                                 updateDialog.show()
                                 
@@ -163,10 +175,12 @@ class MainActivity : Activity() {
                             }
                         }
                         "CHECK_MODELS" -> {
+                            tvStatus.text = "Проверка моделей..."
                             Log.d("USB", "Получили CHECK_MODELS, отвечаем MODELS_OK")
                             usbManager.send("MODELS_OK")
                         }
                         "START_TRANSLATOR" -> {
+                            tvStatus.text = "Запуск переводчика..."
                             Log.d("USB", "Получили START_TRANSLATOR, запускаем активити")
                             val prefs = getSharedPreferences("AppPrefs", android.content.Context.MODE_PRIVATE)
                             if (prefs.contains("pref_from_lang") && prefs.contains("pref_to_lang")) {

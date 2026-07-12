@@ -16,11 +16,12 @@ import org.vosk.android.RecognitionListener
 import org.vosk.android.SpeechService
 import org.vosk.android.StorageService
 import android.content.Intent
+import androidx.appcompat.app.AppCompatActivity
 import com.google.mlkit.nl.translate.TranslateLanguage
 import java.io.IOException
 import java.util.Locale
 
-class TranslatorActivity : Activity(), RecognitionListener, TextToSpeech.OnInitListener {
+class TranslatorActivity : AppCompatActivity(), RecognitionListener, TextToSpeech.OnInitListener {
 
     private var speechService: SpeechService? = null
     private var tts: TextToSpeech? = null
