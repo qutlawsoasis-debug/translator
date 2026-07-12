@@ -257,8 +257,15 @@ class LanguageSelectActivity : AppCompatActivity() {
                     if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
                         btnCancel.visibility = View.GONE
                         btnStart.text = "Распаковка модели..."
+                        val wakeLock = (getSystemService(Context.POWER_SERVICE) as android.os.PowerManager)
+                            .newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "TalkSync:unzip")
+                        wakeLock.acquire(30 * 60 * 1000L) // 30 minutes max
                         try {
-                            voskManager.extractModel(sourceLang.code)
+                            voskManager.extractModel(sourceLang.code) { progress ->
+                                kotlinx.coroutines.withContext(Dispatchers.Main) {
+                                    btnStart.text = "Распаковка... $progress файлов"
+                                }
+                            }
                             prefs.edit().remove("download_${sourceLang.code}").apply()
                             voskDone = true
                             checkModelsStatus()
@@ -268,6 +275,10 @@ class LanguageSelectActivity : AppCompatActivity() {
                             btnStart.isEnabled = true
                             progressBar.visibility = View.INVISIBLE
                             Toast.makeText(this@LanguageSelectActivity, "Ошибка распаковки", Toast.LENGTH_SHORT).show()
+                        } finally {
+                            if (wakeLock.isHeld) {
+                                wakeLock.release()
+                            }
                         }
                         break
                     } else if (status == android.app.DownloadManager.STATUS_FAILED) {

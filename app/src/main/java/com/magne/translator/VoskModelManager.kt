@@ -110,20 +110,26 @@ class VoskModelManager(private val context: Context) {
         downloadManager.remove(downloadId)
     }
 
-    suspend fun extractModel(langCode: String) = withContext(Dispatchers.IO) {
+    suspend fun extractModel(langCode: String, onProgress: suspend (Int) -> Unit) = withContext(Dispatchers.IO) {
         val baseDir = getBaseDir(langCode)
         val zipFile = File(baseDir, "model.zip")
         if (!zipFile.exists()) throw Exception("Downloaded file missing")
         
-        unzipFile(zipFile, baseDir)
+        unzipFile(zipFile, baseDir, onProgress)
         zipFile.delete()
         File(baseDir, "model.ready").createNewFile()
     }
 
-    private fun unzipFile(zipFile: File, targetDirectory: File) {
+    private suspend fun unzipFile(zipFile: File, targetDirectory: File, onProgress: suspend (Int) -> Unit) {
         ZipInputStream(zipFile.inputStream()).use { zis ->
             var entry: ZipEntry? = zis.nextEntry
+            var entriesProcessed = 0
             while (entry != null) {
+                entriesProcessed++
+                if (entriesProcessed % 100 == 0) {
+                    onProgress(entriesProcessed)
+                }
+                
                 val file = File(targetDirectory, entry.name)
                 val canonicalPath = file.canonicalPath
                 if (!canonicalPath.startsWith(targetDirectory.canonicalPath)) {
