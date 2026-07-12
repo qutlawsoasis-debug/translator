@@ -79,20 +79,32 @@ class TranslatorActivity : AppCompatActivity(), RecognitionListener, TextToSpeec
         translatorManager.downloadModelIfNeeded(
             context = this,
             onSuccess = {
-                tvStatus.text = "Загрузка Vosk модели..."
+                val animationJob = lifecycleScope.launch(Dispatchers.Main) {
+                    var dots = 0
+                    var seconds = 0
+                    while (true) {
+                        tvStatus.text = "Загрузка 2GB модели в RAM (${seconds}с)" + ".".repeat(dots % 4)
+                        dots++
+                        if (dots % 2 == 0) seconds++
+                        kotlinx.coroutines.delay(500)
+                    }
+                }
+
                 lifecycleScope.launch(Dispatchers.IO) {
                     try {
                         val fromLang = intent.getStringExtra("from_lang") ?: TranslateLanguage.RUSSIAN
                         val modelPath = VoskModelManager(this@TranslatorActivity).getModelPath(fromLang)
                         val model = Model(modelPath)
                         withContext(Dispatchers.Main) {
+                            animationJob.cancel()
                             tvStatus.text = "Запуск микрофона..."
                             startRecognition(model)
                         }
-                    } catch (e: Exception) {
+                    } catch (t: Throwable) {
                         withContext(Dispatchers.Main) {
-                            tvStatus.text = "Ошибка загрузки Vosk: ${e.message}"
-                            Log.e("Vosk", "Failed to load the model", e)
+                            animationJob.cancel()
+                            tvStatus.text = "Критическая ошибка: ${t.message}"
+                            Log.e("Vosk", "Failed to load the model", t)
                         }
                     }
                 }
