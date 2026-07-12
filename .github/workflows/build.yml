@@ -54,7 +54,9 @@ jobs:
     - name: Rename APK for permanent link
       if: github.ref == 'refs/heads/main'
       run: |
-        mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/TalkSync_latest.apk
+        cd app/build/outputs/apk/debug
+        apk_file=$(ls *.apk | head -n 1)
+        mv "$apk_file" TalkSync_latest.apk
 
     - name: Create Release
       if: github.ref == 'refs/heads/main'
