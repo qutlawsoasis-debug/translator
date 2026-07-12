@@ -39,8 +39,9 @@ class UpdateManager(private val context: Context) {
                 
                 val currentVersion = BuildConfig.VERSION_NAME
 
-                Log.d("UpdateManager", "Remote tag: $tagName")
-                Log.d("UpdateManager", "Local version: $currentVersion")
+                Log.d("Update", "Remote tag raw: $tagName")
+                Log.d("Update", "Local version: $currentVersion")
+                Log.d("Update", "Are different: ${tagName != currentVersion}")
 
                 val assets = json.getJSONArray("assets")
                 var downloadUrl: String? = null
@@ -51,6 +52,8 @@ class UpdateManager(private val context: Context) {
                         break
                     }
                 }
+
+                Log.d("Update", "Download URL: $downloadUrl")
 
                 if (tagName != currentVersion && downloadUrl != null) {
                     return@withContext UpdateResult(tagName, downloadUrl)
