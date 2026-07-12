@@ -17,7 +17,11 @@ import org.vosk.android.SpeechService
 import org.vosk.android.StorageService
 import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.google.mlkit.nl.translate.TranslateLanguage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.Locale
 
@@ -76,15 +80,21 @@ class TranslatorActivity : AppCompatActivity(), RecognitionListener, TextToSpeec
             context = this,
             onSuccess = {
                 tvStatus.text = "Загрузка Vosk модели..."
-                try {
-                    val fromLang = intent.getStringExtra("from_lang") ?: TranslateLanguage.RUSSIAN
-                    val modelPath = VoskModelManager(this).getModelPath(fromLang)
-                    val model = Model(modelPath)
-                    tvStatus.text = "Запуск микрофона..."
-                    startRecognition(model)
-                } catch (e: Exception) {
-                    tvStatus.text = "Ошибка загрузки Vosk: ${e.message}"
-                    Log.e("Vosk", "Failed to load the model", e)
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        val fromLang = intent.getStringExtra("from_lang") ?: TranslateLanguage.RUSSIAN
+                        val modelPath = VoskModelManager(this@TranslatorActivity).getModelPath(fromLang)
+                        val model = Model(modelPath)
+                        withContext(Dispatchers.Main) {
+                            tvStatus.text = "Запуск микрофона..."
+                            startRecognition(model)
+                        }
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            tvStatus.text = "Ошибка загрузки Vosk: ${e.message}"
+                            Log.e("Vosk", "Failed to load the model", e)
+                        }
+                    }
                 }
             },
             onError = { exception ->
