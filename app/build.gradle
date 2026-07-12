@@ -22,7 +22,7 @@ android {
     signingConfigs {
         releaseConfig {
             def storeFileEnv = System.getenv("KEYSTORE_FILE")
-            if (storeFileEnv != null && file(storeFileEnv).exists()) {
+            if (storeFileEnv != null && !storeFileEnv.trim().isEmpty() && file(storeFileEnv).exists() && file(storeFileEnv).isFile()) {
                 storeFile file(storeFileEnv)
                 storePassword System.getenv("STORE_PASSWORD")
                 keyAlias System.getenv("KEY_ALIAS")
@@ -34,7 +34,7 @@ android {
     buildTypes {
         debug {
             def storeFileEnv = System.getenv("KEYSTORE_FILE")
-            if (storeFileEnv != null && file(storeFileEnv).exists()) {
+            if (storeFileEnv != null && !storeFileEnv.trim().isEmpty() && file(storeFileEnv).exists() && file(storeFileEnv).isFile()) {
                 signingConfig signingConfigs.releaseConfig
             } else {
                 signingConfig signingConfigs.debug
@@ -44,7 +44,7 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             def storeFileEnv = System.getenv("KEYSTORE_FILE")
-            if (storeFileEnv != null && file(storeFileEnv).exists()) {
+            if (storeFileEnv != null && !storeFileEnv.trim().isEmpty() && file(storeFileEnv).exists() && file(storeFileEnv).isFile()) {
                 signingConfig signingConfigs.releaseConfig
             } else {
                 signingConfig signingConfigs.debug
