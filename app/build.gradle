@@ -19,10 +19,26 @@ android {
         buildConfig true
     }
 
+    signingConfigs {
+        release {
+            def storeFileEnv = System.getenv("KEYSTORE_FILE")
+            if (storeFileEnv != null && file(storeFileEnv).exists()) {
+                storeFile file(storeFileEnv)
+                storePassword System.getenv("STORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
+        debug { 
+            signingConfig signingConfigs.release 
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
     

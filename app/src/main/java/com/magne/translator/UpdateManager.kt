@@ -39,6 +39,9 @@ class UpdateManager(private val context: Context) {
                 
                 val currentVersion = BuildConfig.VERSION_NAME
 
+                Log.d("UpdateManager", "Remote tag: $tagName")
+                Log.d("UpdateManager", "Local version: $currentVersion")
+
                 val assets = json.getJSONArray("assets")
                 var downloadUrl: String? = null
                 for (i in 0 until assets.length()) {

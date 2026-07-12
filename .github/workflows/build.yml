@@ -28,7 +28,16 @@ jobs:
       with:
         gradle-version: '8.4'
 
+    - name: Decode Keystore
+      run: |
+        echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > release.jks
+
     - name: Build with Gradle
+      env:
+        KEYSTORE_FILE: ../release.jks
+        STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
       run: gradle assembleDebug
 
     - name: Upload APK
@@ -36,13 +45,6 @@ jobs:
       with:
         name: TalkSync-APK
         path: app/build/outputs/apk/debug/*.apk
-
-    - name: Delete Old Release
-      if: github.ref == 'refs/heads/main'
-      run: |
-        gh release delete latest --cleanup-tag -y || true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Extract Version
       if: github.ref == 'refs/heads/main'
@@ -63,7 +65,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: app/build/outputs/apk/debug/TalkSync_latest.apk
-        tag_name: latest
+        tag_name: v${{ steps.extract_version.outputs.version }}
         name: ${{ steps.extract_version.outputs.version }}
         body: |
           TalkSync APK (Автоматическая сборка)
