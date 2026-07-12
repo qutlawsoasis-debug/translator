@@ -51,11 +51,16 @@ jobs:
         VERSION=$(grep -oP 'versionName "\K[^"]+' app/build.gradle)
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+    - name: Rename APK for permanent link
+      if: github.ref == 'refs/heads/main'
+      run: |
+        mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/TalkSync_latest.apk
+
     - name: Create Release
       if: github.ref == 'refs/heads/main'
       uses: softprops/action-gh-release@v2
       with:
-        files: app/build/outputs/apk/debug/*.apk
+        files: app/build/outputs/apk/debug/TalkSync_latest.apk
         tag_name: latest
         name: ${{ steps.extract_version.outputs.version }}
         body: |
