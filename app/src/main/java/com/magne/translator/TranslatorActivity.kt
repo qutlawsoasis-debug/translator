@@ -75,16 +75,17 @@ class TranslatorActivity : AppCompatActivity(), RecognitionListener, TextToSpeec
         translatorManager.downloadModelIfNeeded(
             context = this,
             onSuccess = {
-                tvStatus.text = "Распаковка модели (один раз)..."
-                StorageService.unpack(this, "model-ru", "model",
-                    { model ->
-                        tvStatus.text = "Запуск микрофона..."
-                        startRecognition(model)
-                    },
-                    { exception ->
-                        tvStatus.text = "Ошибка загрузки: ${exception.message}"
-                        Log.e("Vosk", "Failed to unpack the model", exception)
-                    })
+                tvStatus.text = "Загрузка Vosk модели..."
+                try {
+                    val fromLang = intent.getStringExtra("from_lang") ?: TranslateLanguage.RUSSIAN
+                    val modelPath = VoskModelManager(this).getModelPath(fromLang)
+                    val model = Model(modelPath)
+                    tvStatus.text = "Запуск микрофона..."
+                    startRecognition(model)
+                } catch (e: Exception) {
+                    tvStatus.text = "Ошибка загрузки Vosk: ${e.message}"
+                    Log.e("Vosk", "Failed to load the model", e)
+                }
             },
             onError = { exception ->
                 tvStatus.text = "Ошибка скачивания словаря: ${exception.message}"
