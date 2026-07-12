@@ -56,6 +56,7 @@ class TranslatorActivity : Activity(), RecognitionListener, TextToSpeech.OnInitL
     private fun initModel() {
         tvStatus.text = "Загрузка перевода (нужен интернет)..."
         translatorManager.downloadModelIfNeeded(
+            context = this,
             onSuccess = {
                 tvStatus.text = "Распаковка модели (один раз)..."
                 StorageService.unpack(this, "model-ru", "model",

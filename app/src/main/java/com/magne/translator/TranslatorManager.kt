@@ -13,22 +13,20 @@ class TranslatorManager {
 
     private val translator = Translation.getClient(options)
 
-    fun downloadModelIfNeeded(onSuccess: () -> Unit, onError: (Exception) -> Unit) {
-        val modelManager = com.google.mlkit.common.model.RemoteModelManager.getInstance()
-        val model = com.google.mlkit.nl.translate.TranslateRemoteModel.Builder(TranslateLanguage.RUSSIAN).build()
-        
-        modelManager.isModelDownloaded(model).addOnSuccessListener { isDownloaded ->
-            if (isDownloaded) {
-                onSuccess()
-            } else {
-                val conditions = DownloadConditions.Builder().build()
-                translator.downloadModelIfNeeded(conditions)
-                    .addOnSuccessListener { onSuccess() }
-                    .addOnFailureListener { onError(it) }
-            }
-        }.addOnFailureListener { 
-            onError(it)
+    fun downloadModelIfNeeded(context: android.content.Context, onSuccess: () -> Unit, onError: (Exception) -> Unit) {
+        val prefs = context.getSharedPreferences("TranslatorPrefs", android.content.Context.MODE_PRIVATE)
+        if (prefs.getBoolean("is_model_downloaded_once", false)) {
+            onSuccess()
+            return
         }
+
+        val conditions = DownloadConditions.Builder().build()
+        translator.downloadModelIfNeeded(conditions)
+            .addOnSuccessListener { 
+                prefs.edit().putBoolean("is_model_downloaded_once", true).apply()
+                onSuccess() 
+            }
+            .addOnFailureListener { onError(it) }
     }
 
     fun translate(russianText: String, onSuccess: (String) -> Unit, onError: (Exception) -> Unit) {
