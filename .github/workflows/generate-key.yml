@@ -1,0 +1,25 @@
+name: Generate Keystore
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Generate Keystore
+      run: |
+        keytool -genkey -v -keystore release.jks -alias translator -keyalg RSA -keysize 2048 -validity 10000 -storepass translator123 -keypass translator123 -dname "CN=Translator, OU=Dev, O=Oasis, L=City, S=State, C=RU"
+        echo "========================================================="
+        echo "YOUR BASE64 KEYSTORE STRING:"
+        echo "========================================================="
+        base64 -w 0 release.jks
+        echo ""
+        echo "========================================================="
