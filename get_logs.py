@@ -3,7 +3,7 @@ import json
 import sys
 
 def check():
-    url = "https://api.github.com/repos/qutlawsoasis-debug/translator/actions/runs/29188858320/jobs"
+    url = f"https://api.github.com/repos/qutlawsoasis-debug/translator/actions/runs/{sys.argv[1]}/jobs"
     req = urllib.request.Request(url)
     try:
         with urllib.request.urlopen(req) as response:
