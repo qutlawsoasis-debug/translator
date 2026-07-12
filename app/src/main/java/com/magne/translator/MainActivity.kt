@@ -36,6 +36,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvVersion: TextView
     private lateinit var progressBar: CircularProgressIndicator
     
+    private var isHandshakeInProgress = false
+    private var isUpdating = false
     private var isTranslatorRunning = false
 
     companion object {
@@ -130,12 +132,13 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     when (command) {
                         "HELLO" -> {
-                            if (!isTranslatorRunning) {
-                                Log.d("USB", "Получили HELLO, отвечаем APP_READY")
-                                usbManager.send("APP_READY")
-                            } else {
-                                Log.d("USB", "Получили HELLO, но переводчик уже запущен. Игнорируем.")
+                            if (isHandshakeInProgress || isUpdating || isTranslatorRunning) {
+                                Log.d("USB", "Игнорируем HELLO — уже в процессе")
+                                return@runOnUiThread
                             }
+                            isHandshakeInProgress = true
+                            Log.d("USB", "Получили HELLO, отвечаем APP_READY")
+                            usbManager.send("APP_READY")
                         }
                         "CHECK_UPDATE" -> {
                             tvStatus.text = "Проверка обновлений..."
@@ -150,6 +153,8 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                         "SHOW_UPDATE_DIALOG" -> {
+                            isHandshakeInProgress = false
+                            isUpdating = true
                             Log.d("USB", "Получили SHOW_UPDATE_DIALOG, показываем кастомный диалог")
                             updateResult?.let { result ->
                                 val dialogView = layoutInflater.inflate(R.layout.dialog_update, null)
@@ -174,9 +179,11 @@ class MainActivity : AppCompatActivity() {
                                             tvUpdateProgress.text = "$progress%" 
                                         }
                                     }
+                                    isUpdating = false
                                     runOnUiThread { updateDialog.dismiss() }
                                 }
                             } ?: run {
+                                isUpdating = false
                                 usbManager.send("UPDATE_NONE")
                             }
                         }
@@ -186,9 +193,11 @@ class MainActivity : AppCompatActivity() {
                             usbManager.send("MODELS_OK")
                         }
                         "START_TRANSLATOR" -> {
+                            isHandshakeInProgress = false
+                            isUpdating = false
+                            isTranslatorRunning = true
                             tvStatus.text = "Запуск переводчика..."
                             Log.d("USB", "Получили START_TRANSLATOR, запускаем активити")
-                            isTranslatorRunning = true
                             val prefs = getSharedPreferences("AppPrefs", android.content.Context.MODE_PRIVATE)
                             if (prefs.contains("pref_from_lang") && prefs.contains("pref_to_lang")) {
                                 val intent = Intent(this@MainActivity, TranslatorActivity::class.java)
@@ -215,6 +224,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        isHandshakeInProgress = false
+        isUpdating = false
+        isTranslatorRunning = false
         checkUsbDevices()
     }
 
