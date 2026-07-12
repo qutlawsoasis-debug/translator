@@ -44,7 +44,7 @@ jobs:
           --user-agent "Mozilla/5.0" \
           --max-redirs 10 \
           -o /tmp/rtranslator.apk \
-          "https://github.com/niedev/RTranslator/releases/download/2.1.5/RTranslator.apk"
+          "https://github.com/niedev/RTranslator/releases/download/2.1.5/RTranslator_2.1.5.apk"
         
         # Проверяем что скачалось
         echo "Downloaded file size:"
