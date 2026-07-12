@@ -15,6 +15,8 @@ import org.vosk.Recognizer
 import org.vosk.android.RecognitionListener
 import org.vosk.android.SpeechService
 import org.vosk.android.StorageService
+import android.content.Intent
+import com.google.mlkit.nl.translate.TranslateLanguage
 import java.io.IOException
 import java.util.Locale
 
