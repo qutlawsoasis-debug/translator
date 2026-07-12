@@ -1,105 +1,118 @@
 package com.magne.translator
 
+import android.app.DownloadManager
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import com.google.mlkit.nl.translate.TranslateLanguage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 
 class VoskModelManager(private val context: Context) {
 
-    private val modelUrls = mapOf(
-        TranslateLanguage.RUSSIAN to "https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip",
-        TranslateLanguage.ENGLISH to "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip",
-        TranslateLanguage.GERMAN to "https://alphacephei.com/vosk/models/vosk-model-small-de-0.15.zip",
-        TranslateLanguage.FRENCH to "https://alphacephei.com/vosk/models/vosk-model-small-fr-0.22.zip",
-        TranslateLanguage.SPANISH to "https://alphacephei.com/vosk/models/vosk-model-small-es-0.42.zip",
-        TranslateLanguage.ITALIAN to "https://alphacephei.com/vosk/models/vosk-model-small-it-0.22.zip",
-        TranslateLanguage.CHINESE to "https://alphacephei.com/vosk/models/vosk-model-small-cn-0.22.zip",
+    val modelUrls = mapOf(
+        TranslateLanguage.RUSSIAN to "https://alphacephei.com/vosk/models/vosk-model-ru-0.42.zip",
+        TranslateLanguage.ENGLISH to "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22.zip",
+        TranslateLanguage.GERMAN to "https://alphacephei.com/vosk/models/vosk-model-de-0.21.zip",
+        TranslateLanguage.FRENCH to "https://alphacephei.com/vosk/models/vosk-model-fr-0.22.zip",
+        TranslateLanguage.SPANISH to "https://alphacephei.com/vosk/models/vosk-model-es-0.42.zip",
+        TranslateLanguage.ITALIAN to "https://alphacephei.com/vosk/models/vosk-model-it-0.22.zip",
+        TranslateLanguage.CHINESE to "https://alphacephei.com/vosk/models/vosk-model-cn-0.22.zip",
         TranslateLanguage.KOREAN to "https://alphacephei.com/vosk/models/vosk-model-small-ko-0.22.zip",
-        TranslateLanguage.JAPANESE to "https://alphacephei.com/vosk/models/vosk-model-small-ja-0.22.zip",
-        TranslateLanguage.PORTUGUESE to "https://alphacephei.com/vosk/models/vosk-model-small-pt-0.3.zip"
+        TranslateLanguage.JAPANESE to "https://alphacephei.com/vosk/models/vosk-model-ja-0.22.zip",
+        TranslateLanguage.PORTUGUESE to "https://alphacephei.com/vosk/models/vosk-model-pt-fb-v0.1.1-20220516_2113.zip"
     )
 
+    val modelSizesMB = mapOf(
+        TranslateLanguage.RUSSIAN to 1800,
+        TranslateLanguage.ENGLISH to 1800,
+        TranslateLanguage.GERMAN to 289,
+        TranslateLanguage.FRENCH to 1400,
+        TranslateLanguage.SPANISH to 1400,
+        TranslateLanguage.ITALIAN to 1200,
+        TranslateLanguage.CHINESE to 1300,
+        TranslateLanguage.KOREAN to 82,
+        TranslateLanguage.JAPANESE to 1000,
+        TranslateLanguage.PORTUGUESE to 1500
+    )
+
+    fun getBaseDir(langCode: String): File {
+        return File(context.getExternalFilesDir(null), "vosk_models/$langCode")
+    }
+
     fun isModelReady(langCode: String): Boolean {
-        val modelDir = File(context.getExternalFilesDir(null), "vosk_models/$langCode")
-        return File(modelDir, "model.ready").exists()
+        return File(getBaseDir(langCode), "model.ready").exists()
     }
 
     fun getModelPath(langCode: String): String {
-        val baseDir = File(context.getExternalFilesDir(null), "vosk_models/$langCode")
-        // Vosk models usually unzip into a single directory, we need to find it
+        val baseDir = getBaseDir(langCode)
         val subDirs = baseDir.listFiles { file -> file.isDirectory }
         return subDirs?.firstOrNull()?.absolutePath ?: baseDir.absolutePath
     }
 
-    suspend fun downloadAndExtractModel(langCode: String, onProgress: (Int) -> Unit) = withContext(Dispatchers.IO) {
+    fun startDownload(langCode: String): Long {
         val urlString = modelUrls[langCode] ?: throw IllegalArgumentException("No URL for language: $langCode")
-        val baseDir = File(context.getExternalFilesDir(null), "vosk_models/$langCode")
-        
-        if (baseDir.exists()) {
-            baseDir.deleteRecursively()
-        }
+        val baseDir = getBaseDir(langCode)
+        if (baseDir.exists()) baseDir.deleteRecursively()
         baseDir.mkdirs()
 
-        val zipFile = File(baseDir, "update.zip")
+        val zipFile = File(baseDir, "model.zip")
+        val request = DownloadManager.Request(Uri.parse(urlString))
+            .setDestinationUri(Uri.fromFile(zipFile))
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+            .setTitle("TalkSync: загрузка модели $langCode")
+            .setAllowedOverMetered(true)
 
-        try {
-            // Download
-            val url = URL(urlString)
-            val connection = url.openConnection() as HttpURLConnection
-            connection.connect()
+        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        return downloadManager.enqueue(request)
+    }
 
-            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                throw Exception("Server returned HTTP ${connection.responseCode}")
-            }
-
-            val fileLength = connection.contentLength
-            val input = connection.inputStream
-            val output = FileOutputStream(zipFile)
-
-            val data = ByteArray(4096)
-            var total: Long = 0
-            var count: Int
-
-            while (input.read(data).also { count = it } != -1) {
-                total += count.toLong()
-                if (fileLength > 0) {
-                    val progress = (total * 100 / fileLength).toInt()
-                    // Cap downloading progress at 80% to leave room for unzipping progress
-                    withContext(Dispatchers.Main) { onProgress((progress * 0.8).toInt()) }
-                }
-                output.write(data, 0, count)
-            }
-            output.flush()
-            output.close()
-            input.close()
-
-            // Extract
-            withContext(Dispatchers.Main) { onProgress(85) }
-            unzipFile(zipFile, baseDir)
-            withContext(Dispatchers.Main) { onProgress(95) }
+    fun getDownloadProgress(downloadId: Long): Pair<Int, Int>? {
+        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val cursor = downloadManager.query(DownloadManager.Query().setFilterById(downloadId))
+        if (cursor != null && cursor.moveToFirst()) {
+            val bytesDownloadedIndex = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+            val bytesTotalIndex = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
             
-            // Delete zip
-            zipFile.delete()
-
-            // Create ready marker
-            File(baseDir, "model.ready").createNewFile()
-            withContext(Dispatchers.Main) { onProgress(100) }
-
-        } catch (e: Exception) {
-            Log.e("VoskModelManager", "Error downloading model for $langCode", e)
-            if (baseDir.exists()) {
-                baseDir.deleteRecursively()
+            if (bytesDownloadedIndex != -1 && bytesTotalIndex != -1) {
+                val downloaded = cursor.getLong(bytesDownloadedIndex)
+                var total = cursor.getLong(bytesTotalIndex)
+                if (total <= 0) total = 100 * 1024 * 1024 // fallback
+                cursor.close()
+                return Pair((downloaded / (1024 * 1024)).toInt(), (total / (1024 * 1024)).toInt())
             }
-            throw e
+            cursor.close()
         }
+        return null
+    }
+
+    fun getDownloadStatus(downloadId: Long): Int {
+        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val cursor = downloadManager.query(DownloadManager.Query().setFilterById(downloadId))
+        if (cursor != null && cursor.moveToFirst()) {
+            val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+            if (statusIndex != -1) {
+                val status = cursor.getInt(statusIndex)
+                cursor.close()
+                return status
+            }
+            cursor.close()
+        }
+        return DownloadManager.STATUS_FAILED
+    }
+
+    suspend fun extractModel(langCode: String) = withContext(Dispatchers.IO) {
+        val baseDir = getBaseDir(langCode)
+        val zipFile = File(baseDir, "model.zip")
+        if (!zipFile.exists()) throw Exception("Downloaded file missing")
+        
+        unzipFile(zipFile, baseDir)
+        zipFile.delete()
+        File(baseDir, "model.ready").createNewFile()
     }
 
     private fun unzipFile(zipFile: File, targetDirectory: File) {
