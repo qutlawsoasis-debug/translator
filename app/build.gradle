@@ -13,6 +13,12 @@ android {
         targetSdk 34
         versionCode 21
         versionName "1.2.7"
+        externalNativeBuild {
+            cmake {
+                cppFlags ''
+                abiFilters 'arm64-v8a'
+            }
+        }
     }
 
     buildFeatures {
@@ -52,6 +58,13 @@ android {
         }
     }
     
+    externalNativeBuild {
+        cmake {
+            path file('src/main/cpp/CMakeLists.txt')
+            version '3.22.1'
+        }
+    }
+
     applicationVariants.all { variant ->
         variant.outputs.all {
             outputFileName = "TalkSync_v${variant.versionName}.apk"
@@ -78,10 +91,10 @@ dependencies {
     // USB Serial
     implementation 'com.github.mik3y:usb-serial-for-android:3.7.3'
     
-    // Vosk (Offline Speech-To-Text)
-    implementation 'net.java.dev.jna:jna:5.18.1@aar'
-    implementation 'com.alphacephei:vosk-android:0.3.75@aar'
-
-    // Google ML Kit (Offline Translation)
-    implementation 'com.google.mlkit:translate:17.0.2'
+    // ONNX Runtime (Whisper & NLLB)
+    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.16.0'
+    implementation 'com.microsoft.onnxruntime:onnxruntime-extensions-android:0.12.4'
+    
+    // Google ML Kit (Language ID)
+    implementation 'com.google.android.gms:play-services-mlkit-language-id:17.0.0'
 }
