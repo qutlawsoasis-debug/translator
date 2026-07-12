@@ -120,8 +120,15 @@ class MainActivity : Activity() {
                             usbManager.send("APP_READY")
                         }
                         "CHECK_UPDATE" -> {
-                            Log.d("USB", "Получили CHECK_UPDATE, временно пропускаем обновление")
-                            usbManager.send("UPDATE_NONE")
+                            Log.d("USB", "Получили CHECK_UPDATE, проверяем обновления")
+                            mainScope.launch {
+                                updateResult = updateManager.checkUpdate()
+                                if (updateResult != null) {
+                                    usbManager.send("UPDATE_AVAILABLE")
+                                } else {
+                                    usbManager.send("UPDATE_NONE")
+                                }
+                            }
                         }
                         "SHOW_UPDATE_DIALOG" -> {
                             Log.d("USB", "Получили SHOW_UPDATE_DIALOG, показываем кастомный диалог")
