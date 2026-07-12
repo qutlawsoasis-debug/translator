@@ -132,6 +132,17 @@
         android:background="@drawable/bg_btn_start"
         app:backgroundTint="@null" />
 
+    <Button
+        android:id="@+id/btnCancel"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="Отменить загрузку"
+        android:textSize="14sp"
+        android:textColor="#F44336"
+        android:background="@android:color/transparent"
+        android:layout_marginTop="4dp"
+        android:visibility="gone" />
+
     <com.google.android.material.progressindicator.LinearProgressIndicator
         android:id="@+id/progressBar"
         android:layout_width="match_parent"

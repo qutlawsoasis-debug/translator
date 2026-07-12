@@ -50,6 +50,7 @@ class LanguageSelectActivity : AppCompatActivity() {
     private lateinit var tvSourceStatus: TextView
     private lateinit var tvTargetStatus: TextView
     private lateinit var btnStart: Button
+    private lateinit var btnCancel: Button
     private lateinit var progressBar: LinearProgressIndicator
 
     private var sourceLang: LanguageItem = languages[0]
@@ -71,6 +72,7 @@ class LanguageSelectActivity : AppCompatActivity() {
         tvSourceStatus = findViewById(R.id.tvSourceStatus)
         tvTargetStatus = findViewById(R.id.tvTargetStatus)
         btnStart = findViewById(R.id.btnStart)
+        btnCancel = findViewById(R.id.btnCancel)
         progressBar = findViewById(R.id.progressBar)
 
         val prefs = getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
@@ -97,6 +99,21 @@ class LanguageSelectActivity : AppCompatActivity() {
                 .apply()
 
             downloadModelsAndStart()
+        }
+
+        btnCancel.setOnClickListener {
+            val downloadId = prefs.getLong("download_${sourceLang.code}", -1L)
+            if (downloadId != -1L) {
+                voskManager.cancelDownload(downloadId)
+                prefs.edit().remove("download_${sourceLang.code}").apply()
+            }
+            downloadJob?.cancel()
+            
+            progressBar.visibility = View.INVISIBLE
+            btnCancel.visibility = View.GONE
+            btnStart.isEnabled = true
+            btnStart.text = "Начать"
+            checkModelsStatus()
         }
     }
 
@@ -234,9 +251,11 @@ class LanguageSelectActivity : AppCompatActivity() {
             }
 
             downloadJob = lifecycleScope.launch {
+                btnCancel.visibility = View.VISIBLE
                 while (true) {
                     val status = voskManager.getDownloadStatus(downloadId)
                     if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
+                        btnCancel.visibility = View.GONE
                         btnStart.text = "Распаковка модели..."
                         try {
                             voskManager.extractModel(sourceLang.code)
@@ -252,6 +271,7 @@ class LanguageSelectActivity : AppCompatActivity() {
                         }
                         break
                     } else if (status == android.app.DownloadManager.STATUS_FAILED) {
+                        btnCancel.visibility = View.GONE
                         btnStart.text = "Начать"
                         btnStart.isEnabled = true
                         progressBar.visibility = View.INVISIBLE

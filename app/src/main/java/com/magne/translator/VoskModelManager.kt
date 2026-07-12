@@ -105,6 +105,11 @@ class VoskModelManager(private val context: Context) {
         return DownloadManager.STATUS_FAILED
     }
 
+    fun cancelDownload(downloadId: Long) {
+        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        downloadManager.remove(downloadId)
+    }
+
     suspend fun extractModel(langCode: String) = withContext(Dispatchers.IO) {
         val baseDir = getBaseDir(langCode)
         val zipFile = File(baseDir, "model.zip")
