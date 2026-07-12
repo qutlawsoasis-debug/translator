@@ -29,12 +29,16 @@ jobs:
         gradle-version: '8.4'
 
     - name: Decode Keystore
+      env:
+        KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
       run: |
-        echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > release.jks
+        if [ -n "$KEYSTORE_BASE64" ]; then
+          echo "$KEYSTORE_BASE64" | base64 --decode > release.jks
+        fi
 
     - name: Build with Gradle
       env:
-        KEYSTORE_FILE: ../release.jks
+        KEYSTORE_FILE: ${{ secrets.KEYSTORE_BASE64 != '' && '../release.jks' || '' }}
         STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}

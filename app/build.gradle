@@ -20,7 +20,7 @@ android {
     }
 
     signingConfigs {
-        release {
+        releaseConfig {
             def storeFileEnv = System.getenv("KEYSTORE_FILE")
             if (storeFileEnv != null && file(storeFileEnv).exists()) {
                 storeFile file(storeFileEnv)
@@ -32,13 +32,23 @@ android {
     }
 
     buildTypes {
-        debug { 
-            signingConfig signingConfigs.release 
+        debug {
+            def storeFileEnv = System.getenv("KEYSTORE_FILE")
+            if (storeFileEnv != null && file(storeFileEnv).exists()) {
+                signingConfig signingConfigs.releaseConfig
+            } else {
+                signingConfig signingConfigs.debug
+            }
         }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            def storeFileEnv = System.getenv("KEYSTORE_FILE")
+            if (storeFileEnv != null && file(storeFileEnv).exists()) {
+                signingConfig signingConfigs.releaseConfig
+            } else {
+                signingConfig signingConfigs.debug
+            }
         }
     }
     
