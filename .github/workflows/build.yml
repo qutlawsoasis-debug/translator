@@ -37,6 +37,13 @@ jobs:
         name: TalkSync-APK
         path: app/build/outputs/apk/debug/*.apk
 
+    - name: Delete Old Release
+      if: github.ref == 'refs/heads/main'
+      run: |
+        gh release delete latest --cleanup-tag -y || true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Create Release
       if: github.ref == 'refs/heads/main'
       uses: softprops/action-gh-release@v2
@@ -45,6 +52,6 @@ jobs:
         tag_name: latest
         name: Latest Release
         body: |
-          Оффлайн Переводчик APK (Автоматическая сборка)
+          TalkSync APK (Автоматическая сборка)
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
