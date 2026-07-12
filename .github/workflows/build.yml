@@ -45,8 +45,7 @@ jobs:
         if [ -f release.jks ]; then
           export KEYSTORE_FILE="$(pwd)/release.jks"
         fi
-        chmod +x gradlew
-        ./gradlew assembleDebug
+        gradle assembleDebug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
