@@ -22,11 +22,13 @@ class TranslatorActivity : Activity(), RecognitionListener, TextToSpeech.OnInitL
 
     private var speechService: SpeechService? = null
     private var tts: TextToSpeech? = null
-    private val translatorManager = TranslatorManager()
+    private lateinit var translatorManager: TranslatorManager
+    private var toLangCode: String = TranslateLanguage.ENGLISH
     
     private lateinit var tvStatus: TextView
     private lateinit var tvRecognized: TextView
     private lateinit var tvTranslated: TextView
+    private lateinit var btnChangeLanguage: android.widget.Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,8 +37,20 @@ class TranslatorActivity : Activity(), RecognitionListener, TextToSpeech.OnInitL
         tvStatus = findViewById(R.id.tvStatus)
         tvRecognized = findViewById(R.id.tvRecognized)
         tvTranslated = findViewById(R.id.tvTranslated)
+        btnChangeLanguage = findViewById(R.id.btnChangeLanguage)
+
+        val fromLang = intent.getStringExtra("from_lang") ?: TranslateLanguage.RUSSIAN
+        toLangCode = intent.getStringExtra("to_lang") ?: TranslateLanguage.ENGLISH
+        
+        translatorManager = TranslatorManager(fromLang, toLangCode)
 
         tts = TextToSpeech(this, this)
+        
+        btnChangeLanguage.setOnClickListener {
+            val intent = Intent(this, LanguageSelectActivity::class.java)
+            startActivity(intent)
+            finish()
+        }
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             initModel()
@@ -140,7 +154,23 @@ class TranslatorActivity : Activity(), RecognitionListener, TextToSpeech.OnInitL
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            tts?.language = Locale.US
+            tts?.language = getLocaleFromLanguageCode(toLangCode)
+        }
+    }
+
+    private fun getLocaleFromLanguageCode(code: String): Locale {
+        return when (code) {
+            com.google.mlkit.nl.translate.TranslateLanguage.RUSSIAN -> Locale("ru")
+            com.google.mlkit.nl.translate.TranslateLanguage.ENGLISH -> Locale.US
+            com.google.mlkit.nl.translate.TranslateLanguage.GERMAN -> Locale.GERMAN
+            com.google.mlkit.nl.translate.TranslateLanguage.FRENCH -> Locale.FRENCH
+            com.google.mlkit.nl.translate.TranslateLanguage.SPANISH -> Locale("es")
+            com.google.mlkit.nl.translate.TranslateLanguage.ITALIAN -> Locale.ITALIAN
+            com.google.mlkit.nl.translate.TranslateLanguage.CHINESE -> Locale.CHINESE
+            com.google.mlkit.nl.translate.TranslateLanguage.KOREAN -> Locale.KOREAN
+            com.google.mlkit.nl.translate.TranslateLanguage.JAPANESE -> Locale.JAPANESE
+            com.google.mlkit.nl.translate.TranslateLanguage.PORTUGUESE -> Locale("pt")
+            else -> Locale.US
         }
     }
 

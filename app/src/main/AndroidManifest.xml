@@ -35,7 +35,11 @@
         
         <activity
             android:name=".TranslatorActivity"
-            android:exported="false" />
+            android:exported="true" />
+            
+        <activity
+            android:name=".LanguageSelectActivity"
+            android:exported="true" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

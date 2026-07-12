@@ -167,9 +167,17 @@ class MainActivity : Activity() {
                             usbManager.send("MODELS_OK")
                         }
                         "START_TRANSLATOR" -> {
-                            Log.d("USB", "Получили START_TRANSLATOR, запускаем Activity")
-                            val intent = Intent(this, TranslatorActivity::class.java)
-                            startActivity(intent)
+                            Log.d("USB", "Получили START_TRANSLATOR, запускаем активити")
+                            val prefs = getSharedPreferences("AppPrefs", android.content.Context.MODE_PRIVATE)
+                            if (prefs.contains("pref_from_lang") && prefs.contains("pref_to_lang")) {
+                                val intent = Intent(this@MainActivity, TranslatorActivity::class.java)
+                                intent.putExtra("from_lang", prefs.getString("pref_from_lang", ""))
+                                intent.putExtra("to_lang", prefs.getString("pref_to_lang", ""))
+                                startActivity(intent)
+                            } else {
+                                val intent = Intent(this@MainActivity, LanguageSelectActivity::class.java)
+                                startActivity(intent)
+                            }
                         }
                         "CLOSE" -> {
                             Log.d("USB", "Получили CLOSE, закрываем приложение")
