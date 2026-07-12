@@ -11,8 +11,8 @@ android {
         applicationId "com.magne.translator"
         minSdk 24
         targetSdk 34
-        versionCode 2
-        versionName "1.0.1"
+        versionCode 3
+        versionName "1.0.2"
     }
 
     buildFeatures {
@@ -49,4 +49,7 @@ dependencies {
     // Vosk (Offline Speech-To-Text)
     implementation 'net.java.dev.jna:jna:5.18.1@aar'
     implementation 'com.alphacephei:vosk-android:0.3.75@aar'
+
+    // Google ML Kit (Offline Translation)
+    implementation 'com.google.mlkit:translate:17.0.2'
 }

@@ -54,16 +54,25 @@ class TranslatorActivity : Activity(), RecognitionListener, TextToSpeech.OnInitL
     }
 
     private fun initModel() {
-        tvStatus.text = "Распаковка модели (один раз)..."
-        StorageService.unpack(this, "model-ru", "model",
-            { model ->
-                tvStatus.text = "Запуск микрофона..."
-                startRecognition(model)
+        tvStatus.text = "Загрузка перевода (нужен интернет)..."
+        translatorManager.downloadModelIfNeeded(
+            onSuccess = {
+                tvStatus.text = "Распаковка модели (один раз)..."
+                StorageService.unpack(this, "model-ru", "model",
+                    { model ->
+                        tvStatus.text = "Запуск микрофона..."
+                        startRecognition(model)
+                    },
+                    { exception ->
+                        tvStatus.text = "Ошибка загрузки: ${exception.message}"
+                        Log.e("Vosk", "Failed to unpack the model", exception)
+                    })
             },
-            { exception ->
-                tvStatus.text = "Ошибка загрузки: ${exception.message}"
-                Log.e("Vosk", "Failed to unpack the model", exception)
-            })
+            onError = { exception ->
+                tvStatus.text = "Ошибка скачивания словаря: ${exception.message}"
+                Log.e("MLKit", "Failed to download model", exception)
+            }
+        )
     }
 
     private fun startRecognition(model: Model) {
@@ -78,7 +87,16 @@ class TranslatorActivity : Activity(), RecognitionListener, TextToSpeech.OnInitL
     }
 
     override fun onPartialResult(hypothesis: String?) {
-        // Опционально: показывать промежуточный результат (убрал, чтобы не мерцало)
+        if (hypothesis == null) return
+        try {
+            val json = JSONObject(hypothesis)
+            val partial = json.getString("partial")
+            if (partial.isNotEmpty()) {
+                tvRecognized.text = partial + "..."
+            }
+        } catch (e: Exception) {
+            // Игнорируем
+        }
     }
 
     override fun onResult(hypothesis: String?) {
@@ -88,15 +106,19 @@ class TranslatorActivity : Activity(), RecognitionListener, TextToSpeech.OnInitL
             val text = json.getString("text")
             if (text.isNotEmpty()) {
                 tvRecognized.text = text
-                val translation = translatorManager.translate(text)
-                if (translation != null) {
-                    tvTranslated.text = translation
-                    tts?.speak(translation, TextToSpeech.QUEUE_FLUSH, null, null)
-                    tvStatus.text = "Переведено!"
-                } else {
-                    tvTranslated.text = ""
-                    tvStatus.text = "Нет в словаре"
-                }
+                tvStatus.text = "Перевожу..."
+                translatorManager.translate(text,
+                    onSuccess = { translation ->
+                        tvTranslated.text = translation
+                        tts?.speak(translation, TextToSpeech.QUEUE_FLUSH, null, null)
+                        tvStatus.text = "Переведено!"
+                    },
+                    onError = { e ->
+                        tvTranslated.text = ""
+                        tvStatus.text = "Ошибка перевода"
+                        Log.e("MLKit", "Translation failed", e)
+                    }
+                )
             }
         } catch (e: Exception) {
             Log.e("Vosk", "JSON Parse error", e)
@@ -127,5 +149,6 @@ class TranslatorActivity : Activity(), RecognitionListener, TextToSpeech.OnInitL
         speechService?.shutdown()
         tts?.stop()
         tts?.shutdown()
+        translatorManager.close()
     }
 }

@@ -1,37 +1,38 @@
 package com.magne.translator
 
-class TranslatorManager {
-    private val dictionary = hashMapOf(
-        "привет" to "Hello",
-        "как дела" to "How are you",
-        "до свидания" to "Goodbye",
-        "пока" to "Goodbye",
-        "спасибо" to "Thank you",
-        "где туалет" to "Where is the restroom",
-        "сколько стоит" to "How much does it cost",
-        "я не понимаю" to "I do not understand",
-        "помогите" to "Help me",
-        "помоги мне" to "Help me",
-        "который час" to "What time is it",
-        "что это" to "What is this"
-    )
+import com.google.mlkit.common.model.DownloadConditions
+import com.google.mlkit.nl.translate.TranslateLanguage
+import com.google.mlkit.nl.translate.Translation
+import com.google.mlkit.nl.translate.TranslatorOptions
 
-    fun translate(russianText: String): String? {
-        val lowerText = russianText.lowercase().trim()
-        if (lowerText.isEmpty()) return null
-        
-        // Точное совпадение
-        if (dictionary.containsKey(lowerText)) {
-            return dictionary[lowerText]
+class TranslatorManager {
+    private val options = TranslatorOptions.Builder()
+        .setSourceLanguage(TranslateLanguage.RUSSIAN)
+        .setTargetLanguage(TranslateLanguage.ENGLISH)
+        .build()
+
+    private val translator = Translation.getClient(options)
+
+    fun downloadModelIfNeeded(onSuccess: () -> Unit, onError: (Exception) -> Unit) {
+        val conditions = DownloadConditions.Builder()
+            .build()
+        translator.downloadModelIfNeeded(conditions)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { onError(it) }
+    }
+
+    fun translate(russianText: String, onSuccess: (String) -> Unit, onError: (Exception) -> Unit) {
+        val text = russianText.trim()
+        if (text.isEmpty()) {
+            onError(Exception("Empty text"))
+            return
         }
-        
-        // Частичное совпадение (если человек сказал чуть больше)
-        for ((key, value) in dictionary) {
-            if (lowerText.contains(key)) {
-                return value
-            }
-        }
-        
-        return null
+        translator.translate(text)
+            .addOnSuccessListener { onSuccess(it) }
+            .addOnFailureListener { onError(it) }
+    }
+    
+    fun close() {
+        translator.close()
     }
 }
