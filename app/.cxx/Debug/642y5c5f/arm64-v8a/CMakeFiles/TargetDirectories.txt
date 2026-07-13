@@ -1,0 +1,3 @@
+/home/runner/work/translator/translator/app/.cxx/Debug/642y5c5f/arm64-v8a/CMakeFiles/talksync.dir
+/home/runner/work/translator/translator/app/.cxx/Debug/642y5c5f/arm64-v8a/CMakeFiles/edit_cache.dir
+/home/runner/work/translator/translator/app/.cxx/Debug/642y5c5f/arm64-v8a/CMakeFiles/rebuild_cache.dir

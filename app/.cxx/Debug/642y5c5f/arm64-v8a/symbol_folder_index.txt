@@ -1,0 +1,1 @@
+/home/runner/work/translator/translator/app/build/intermediates/cxx/Debug/642y5c5f/obj/arm64-v8a
