@@ -12,6 +12,7 @@ import kotlinx.coroutines.*
 import java.io.File
 import java.nio.FloatBuffer
 import java.nio.IntBuffer
+import java.nio.LongBuffer
 import kotlin.math.abs
 
 class WhisperManager(private val context: Context) {

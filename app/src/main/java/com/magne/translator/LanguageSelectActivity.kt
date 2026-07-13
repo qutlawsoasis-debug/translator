@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,34 +12,26 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.progressindicator.LinearProgressIndicator
-import com.google.mlkit.common.model.DownloadConditions
-import com.google.mlkit.common.model.RemoteModelManager
-import com.google.mlkit.nl.translate.TranslateLanguage
-import com.google.mlkit.nl.translate.TranslateRemoteModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 data class LanguageItem(val name: String, val code: String, val emoji: String)
 
 class LanguageSelectActivity : AppCompatActivity() {
 
     private val languages = listOf(
-        LanguageItem("Русский", TranslateLanguage.RUSSIAN, "🇷🇺"),
-        LanguageItem("Английский", TranslateLanguage.ENGLISH, "🇬🇧"),
-        LanguageItem("Немецкий", TranslateLanguage.GERMAN, "🇩🇪"),
-        LanguageItem("Французский", TranslateLanguage.FRENCH, "🇫🇷"),
-        LanguageItem("Испанский", TranslateLanguage.SPANISH, "🇪🇸"),
-        LanguageItem("Итальянский", TranslateLanguage.ITALIAN, "🇮🇹"),
-        LanguageItem("Китайский", TranslateLanguage.CHINESE, "🇨🇳"),
-        LanguageItem("Корейский", TranslateLanguage.KOREAN, "🇰🇷"),
-        LanguageItem("Японский", TranslateLanguage.JAPANESE, "🇯🇵"),
-        LanguageItem("Португальский", TranslateLanguage.PORTUGUESE, "🇵🇹")
+        LanguageItem("Русский", "ru", "🇷🇺"),
+        LanguageItem("Английский", "en", "🇬🇧"),
+        LanguageItem("Немецкий", "de", "🇩🇪"),
+        LanguageItem("Французский", "fr", "🇫🇷"),
+        LanguageItem("Испанский", "es", "🇪🇸"),
+        LanguageItem("Итальянский", "it", "🇮🇹"),
+        LanguageItem("Китайский", "zh", "🇨🇳"),
+        LanguageItem("Корейский", "ko", "🇰🇷"),
+        LanguageItem("Японский", "ja", "🇯🇵"),
+        LanguageItem("Португальский", "pt", "🇵🇹")
     )
 
     private lateinit var cardSource: LinearLayout
@@ -58,8 +49,7 @@ class LanguageSelectActivity : AppCompatActivity() {
     private var sourceLang: LanguageItem = languages[0]
     private var targetLang: LanguageItem = languages[1]
 
-    private val mlModelManager = RemoteModelManager.getInstance()
-    private val voskManager by lazy { VoskModelManager(this) }
+    private val modelManager by lazy { ModelDownloadManager(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -78,8 +68,8 @@ class LanguageSelectActivity : AppCompatActivity() {
         progressBar = findViewById(R.id.progressBar)
 
         val prefs = getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
-        val savedSource = prefs.getString("pref_from_lang", TranslateLanguage.RUSSIAN)
-        val savedTarget = prefs.getString("pref_to_lang", TranslateLanguage.ENGLISH)
+        val savedSource = prefs.getString("pref_from_lang", "ru")
+        val savedTarget = prefs.getString("pref_to_lang", "en")
 
         sourceLang = languages.find { it.code == savedSource } ?: languages[0]
         targetLang = languages.find { it.code == savedTarget } ?: languages[1]
@@ -100,22 +90,25 @@ class LanguageSelectActivity : AppCompatActivity() {
                 .putString("pref_to_lang", targetLang.code)
                 .apply()
 
-            downloadModelsAndStart()
+            if (modelManager.areAllModelsReady()) {
+                startTranslator()
+            } else {
+                android.app.AlertDialog.Builder(this)
+                    .setTitle("Загрузка моделей")
+                    .setMessage("Для оффлайн работы необходимо скачать модели (~1.3GB).\nРекомендуем использовать Wi-Fi.\nНачать загрузку?")
+                    .setPositiveButton("Скачать") { _, _ -> startDownload() }
+                    .setNegativeButton("Отмена", null)
+                    .show()
+            }
         }
 
         btnCancel.setOnClickListener {
-            val downloadId = prefs.getLong("download_${sourceLang.code}", -1L)
-            if (downloadId != -1L) {
-                voskManager.cancelDownload(downloadId)
-                prefs.edit().remove("download_${sourceLang.code}").apply()
-            }
-            downloadJob?.cancel()
-            
+            modelManager.cancelDownloads()
             progressBar.visibility = View.INVISIBLE
             btnCancel.visibility = View.GONE
             btnStart.isEnabled = true
             btnStart.text = "Начать"
-            checkModelsStatus()
+            updateUI()
         }
     }
 
@@ -124,7 +117,19 @@ class LanguageSelectActivity : AppCompatActivity() {
         tvSourceName.text = sourceLang.name
         tvTargetEmoji.text = targetLang.emoji
         tvTargetName.text = targetLang.name
-        checkModelsStatus()
+        
+        val isReady = modelManager.areAllModelsReady()
+        if (isReady) {
+            tvSourceStatus.text = "✅ Нейросети загружены"
+            tvSourceStatus.setTextColor(Color.parseColor("#4CAF50"))
+            tvTargetStatus.text = "Готово к переводу"
+            tvTargetStatus.setTextColor(Color.parseColor("#4CAF50"))
+        } else {
+            tvSourceStatus.text = "⬇ Требуется загрузка"
+            tvSourceStatus.setTextColor(Color.parseColor("#FFC107"))
+            tvTargetStatus.text = "~1.3GB моделей"
+            tvTargetStatus.setTextColor(Color.parseColor("#FFC107"))
+        }
     }
 
     private fun showLanguagePicker(isSource: Boolean) {
@@ -143,187 +148,39 @@ class LanguageSelectActivity : AppCompatActivity() {
         bottomSheetDialog.show()
     }
 
-    private fun checkModelsStatus() {
-        // Source needs Vosk AND ML Kit
-        tvSourceStatus.text = "⏳ Проверка..."
-        tvSourceStatus.setTextColor(Color.parseColor("#AAAAAA"))
-        
-        val sourceMlModel = TranslateRemoteModel.Builder(sourceLang.code).build()
-        mlModelManager.isModelDownloaded(sourceMlModel).addOnSuccessListener { mlDownloaded ->
-            val voskReady = voskManager.isModelReady(sourceLang.code)
-            
-            if (mlDownloaded && voskReady) {
-                tvSourceStatus.text = "✅ Готово"
-                tvSourceStatus.setTextColor(Color.parseColor("#4CAF50"))
-            } else {
-                val voskSize = voskManager.modelSizesMB[sourceLang.code] ?: 100
-                tvSourceStatus.text = "⬇ Нужно скачать ~$voskSize MB (Vosk + ML)"
-                tvSourceStatus.setTextColor(Color.parseColor("#FFC107"))
-            }
-        }.addOnFailureListener {
-            tvSourceStatus.text = "❌ Ошибка"
-            tvSourceStatus.setTextColor(Color.parseColor("#F44336"))
-        }
-
-        // Target needs ONLY ML Kit
-        tvTargetStatus.text = "⏳ Проверка..."
-        tvTargetStatus.setTextColor(Color.parseColor("#AAAAAA"))
-        val targetMlModel = TranslateRemoteModel.Builder(targetLang.code).build()
-        mlModelManager.isModelDownloaded(targetMlModel).addOnSuccessListener { mlDownloaded ->
-            if (mlDownloaded) {
-                tvTargetStatus.text = "✅ Готово"
-                tvTargetStatus.setTextColor(Color.parseColor("#4CAF50"))
-            } else {
-                tvTargetStatus.text = "⬇ ~30MB"
-                tvTargetStatus.setTextColor(Color.parseColor("#FFC107"))
-            }
-        }.addOnFailureListener {
-            tvTargetStatus.text = "❌ Ошибка"
-            tvTargetStatus.setTextColor(Color.parseColor("#F44336"))
-        }
-    }
-
-    private var downloadJob: kotlinx.coroutines.Job? = null
-
-    private fun downloadModelsAndStart() {
+    private fun startDownload() {
         btnStart.isEnabled = false
+        btnCancel.visibility = View.VISIBLE
         progressBar.visibility = View.VISIBLE
 
-        val sourceMlModel = TranslateRemoteModel.Builder(sourceLang.code).build()
-        val targetMlModel = TranslateRemoteModel.Builder(targetLang.code).build()
-        val conditions = DownloadConditions.Builder().build()
-
-        var sourceMlDone = false
-        var targetMlDone = false
-        var voskDone = voskManager.isModelReady(sourceLang.code)
-
-        fun checkAndStart() {
-            if (sourceMlDone && targetMlDone && voskDone) {
+        modelManager.startDownload(
+            onProgress = { progressMsg ->
+                btnStart.text = progressMsg
+            },
+            onSuccess = {
                 progressBar.visibility = View.INVISIBLE
-                btnStart.isEnabled = true
-                val intent = Intent(this, TranslatorActivity::class.java)
-                intent.putExtra("from_lang", sourceLang.code)
-                intent.putExtra("to_lang", targetLang.code)
-                startActivity(intent)
-                finish()
-            }
-        }
-
-        fun startMlDownloads() {
-            // Download Source ML
-            mlModelManager.download(sourceMlModel, conditions).addOnSuccessListener {
-                sourceMlDone = true
-                checkModelsStatus()
-                if (voskDone && targetMlDone && sourceMlDone) {
-                    checkAndStart()
-                } else if (!sourceMlDone || !targetMlDone) {
-                    btnStart.text = "Скачиваю модель перевода..."
-                }
-            }.addOnFailureListener { e ->
-                progressBar.visibility = View.INVISIBLE
+                btnCancel.visibility = View.GONE
                 btnStart.isEnabled = true
                 btnStart.text = "Начать"
-                Toast.makeText(this, "Ошибка загрузки ML", Toast.LENGTH_SHORT).show()
-            }
-
-            // Download Target ML
-            mlModelManager.download(targetMlModel, conditions).addOnSuccessListener {
-                targetMlDone = true
-                checkModelsStatus()
-                if (voskDone && targetMlDone && sourceMlDone) {
-                    checkAndStart()
-                } else if (!sourceMlDone || !targetMlDone) {
-                    btnStart.text = "Скачиваю модель перевода..."
-                }
-            }.addOnFailureListener { e ->
+                startTranslator()
+            },
+            onError = { errorMsg ->
                 progressBar.visibility = View.INVISIBLE
+                btnCancel.visibility = View.GONE
                 btnStart.isEnabled = true
                 btnStart.text = "Начать"
-                Toast.makeText(this, "Ошибка загрузки ML", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show()
+                updateUI()
             }
-        }
+        )
+    }
 
-        fun startVoskDownloadFlow() {
-            val prefs = getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
-            var downloadId = prefs.getLong("download_${sourceLang.code}", -1L)
-            
-            if (downloadId == -1L || voskManager.getDownloadStatus(downloadId) == android.app.DownloadManager.STATUS_FAILED) {
-                downloadId = voskManager.startDownload(sourceLang.code)
-                prefs.edit().putLong("download_${sourceLang.code}", downloadId).apply()
-            }
-
-            downloadJob = lifecycleScope.launch {
-                btnCancel.visibility = View.VISIBLE
-                while (true) {
-                    val status = voskManager.getDownloadStatus(downloadId)
-                    if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
-                        btnCancel.visibility = View.GONE
-                        btnStart.text = "Распаковка модели..."
-                        val wakeLock = (getSystemService(Context.POWER_SERVICE) as android.os.PowerManager)
-                            .newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "TalkSync:unzip")
-                        wakeLock.acquire(30 * 60 * 1000L) // 30 minutes max
-                        try {
-                            voskManager.extractModel(sourceLang.code) { progress ->
-                                kotlinx.coroutines.withContext(Dispatchers.Main) {
-                                    btnStart.text = "Распаковка... $progress файлов"
-                                }
-                            }
-                            prefs.edit().remove("download_${sourceLang.code}").apply()
-                            voskDone = true
-                            checkModelsStatus()
-                            startMlDownloads()
-                        } catch (e: Exception) {
-                            btnStart.text = "Начать"
-                            btnStart.isEnabled = true
-                            progressBar.visibility = View.INVISIBLE
-                            Toast.makeText(this@LanguageSelectActivity, "Ошибка распаковки", Toast.LENGTH_SHORT).show()
-                        } finally {
-                            if (wakeLock.isHeld) {
-                                wakeLock.release()
-                            }
-                        }
-                        break
-                    } else if (status == android.app.DownloadManager.STATUS_FAILED) {
-                        btnCancel.visibility = View.GONE
-                        btnStart.text = "Начать"
-                        btnStart.isEnabled = true
-                        progressBar.visibility = View.INVISIBLE
-                        Toast.makeText(this@LanguageSelectActivity, "Ошибка загрузки", Toast.LENGTH_SHORT).show()
-                        break
-                    } else {
-                        val progress = voskManager.getDownloadProgress(downloadId)
-                        if (progress != null) {
-                            btnStart.text = "Скачиваю модель ${sourceLang.code.uppercase()}... ${progress.first}MB / ${progress.second}MB"
-                        } else {
-                            btnStart.text = "Загрузка..."
-                        }
-                    }
-                    kotlinx.coroutines.delay(1000)
-                }
-            }
-        }
-
-        // Download Vosk if needed
-        if (!voskDone) {
-            val voskSize = voskManager.modelSizesMB[sourceLang.code] ?: 100
-            if (voskSize > 500) {
-                android.app.AlertDialog.Builder(this)
-                    .setTitle("Внимание")
-                    .setMessage("Модель распознавания речи весит ${String.format("%.1f", voskSize / 1024f)}GB.\nРекомендуем использовать Wi-Fi.\nПродолжить?")
-                    .setPositiveButton("Да") { _, _ -> startVoskDownloadFlow() }
-                    .setNegativeButton("Отмена") { _, _ ->
-                        progressBar.visibility = View.INVISIBLE
-                        btnStart.isEnabled = true
-                        btnStart.text = "Начать"
-                    }
-                    .setCancelable(false)
-                    .show()
-            } else {
-                startVoskDownloadFlow()
-            }
-        } else {
-            startMlDownloads()
-        }
+    private fun startTranslator() {
+        val intent = Intent(this, TranslatorActivity::class.java)
+        intent.putExtra("from_lang", sourceLang.code)
+        intent.putExtra("to_lang", targetLang.code)
+        startActivity(intent)
+        finish()
     }
 
     private inner class LanguageAdapter(
