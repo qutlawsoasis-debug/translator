@@ -16,7 +16,8 @@ class ModelDownloadManager(private val context: Context) {
         "NLLB_cache_initializer.onnx",
         "NLLB_decoder.onnx",
         "NLLB_embed_and_lm_head.onnx",
-        "NLLB_encoder.onnx"
+        "NLLB_encoder.onnx",
+        "flores200_sacrebleu_tokenizer_spm.model"
     )
 
     private val whisperFiles = listOf(
